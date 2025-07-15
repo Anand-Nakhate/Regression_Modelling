@@ -1,0 +1,502 @@
+from __future__ import annotations
+import argparse
+import logging
+import os
+import warnings
+import joblib
+import json
+from pathlib import Path
+from datetime import datetime
+from enum import Enum, auto
+from typing import Dict, Callable, Tuple
+
+import numpy as np
+import pandas as pd
+import optuna
+import shap
+from tqdm import tqdm
+
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA, PLSRegression
+from sklearn.linear_model import (
+    LinearRegression, Ridge, Lasso,
+    ElasticNet, BayesianRidge
+)
+from sklearn.metrics import (
+    mean_absolute_error, mean_squared_error,
+    r2_score
+)
+from sklearn.model_selection import BaseCrossValidator
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.ensemble import RandomForestRegressor, StackingRegressor
+from sklearn.neural_network import MLPRegressor
+
+import statsmodels.api as sm
+from lightgbm import LGBMRegressor
+from xgboost import XGBRegressor
+from catboost import CatBoostRegressor
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONSTANTS & SETUP
+# ─────────────────────────────────────────────────────────────────────────────
+warnings.filterwarnings("ignore", category=FutureWarning)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)8s | %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+SEED = 42
+np.random.seed(SEED)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATA LOADING & SPLITTING
+# ─────────────────────────────────────────────────────────────────────────────
+class DataLoader:
+    def __init__(self, x_path: Path, y_path: Path):
+        self.x_df = self._read(x_path)
+        self.y_df = self._read(y_path)
+        # align on index, forward-fill small gaps, then drop remaining nulls
+        self.full = (
+            self.x_df
+            .join(self.y_df, how="inner")
+            .sort_index()
+            .ffill()
+            .dropna()
+        )
+        logging.info(
+            "Final aligned panel: %d obs × %d features",
+            len(self.full), self.x_df.shape[1]
+        )
+
+    @staticmethod
+    def _read(p: Path) -> pd.DataFrame:
+        if p.suffix.lower() in {".parquet", ".pq"}:
+            return pd.read_parquet(p)
+        if p.suffix.lower() == ".csv":
+            return pd.read_csv(p, index_col=0, parse_dates=True)
+        raise ValueError(f"Unsupported file type {p.suffix}")
+
+    def split(self, test_years: int = 2) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        cut = -12 * test_years
+        return self.full.iloc[:cut], self.full.iloc[cut:]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE‑ENGINEERING TRANSFORMERS
+# ─────────────────────────────────────────────────────────────────────────────
+class Lagger(TransformerMixin, BaseEstimator):
+    def __init__(self, lags: int = 3):
+        self.lags = lags
+
+    def fit(self, X, *_):
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        data = {
+            f"{col}_lag{l}": X[col].shift(l)
+            for col in X.columns
+            for l in range(1, self.lags + 1)
+        }
+        return pd.DataFrame(data, index=X.index)
+
+
+class RollingZ(TransformerMixin, BaseEstimator):
+    def __init__(self, window: int = 36):
+        self.window = window
+        self.center = window // 2
+
+    def fit(self, X, *_):
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        mu = X.rolling(self.window, center=True).mean()
+        sd = X.rolling(self.window, center=True).std()
+        return (X - mu) / sd
+
+
+class Delta(TransformerMixin, BaseEstimator):
+    def fit(self, X, *_):
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        return X.diff()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENUMS FOR MODES
+# ─────────────────────────────────────────────────────────────────────────────
+class FeatureMode(Enum):
+    RAW = auto()
+    STATIC_Z = auto()
+    ROLLING_Z = auto()
+
+
+class SubMode(Enum):
+    BASE = auto()       # no lags, no delta
+    LAG = auto()        # +lags only
+    DELTA = auto()      # +delta only
+    LAG_DELTA = auto()  # +lags +delta
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE PIPELINE BUILDER
+# ─────────────────────────────────────────────────────────────────────────────
+def get_feature_pipeline(
+    mode: FeatureMode,
+    sub: SubMode,
+    lag_count: int = 3,
+    roll_window: int = 36
+) -> Pipeline:
+    """
+    Construct a sklearn Pipeline that:
+      1) applies one of {raw, static zscore, rolling zscore}
+      2) optionally adds Lagger and/or Delta
+      3) final scaling (to keep features balanced; sparse ok)
+    """
+    transformers = []
+    all_cols = "__ALL__"  # placeholder
+
+    # 1) base mode
+    if mode is FeatureMode.RAW:
+        transformers.append(("raw", "passthrough", all_cols))
+    elif mode is FeatureMode.STATIC_Z:
+        transformers.append(("static_z", StandardScaler(), all_cols))
+    elif mode is FeatureMode.ROLLING_Z:
+        transformers.append(("rolling_z", RollingZ(window=roll_window), all_cols))
+
+    # 2) sub‑mode
+    if sub in {SubMode.LAG, SubMode.LAG_DELTA}:
+        transformers.append(("lag", Lagger(lags=lag_count), all_cols))
+    if sub in {SubMode.DELTA, SubMode.LAG_DELTA}:
+        transformers.append(("delta", Delta(), all_cols))
+
+    # assemble ColumnTransformer
+    ct = ColumnTransformer(
+        transformers,
+        remainder="drop",
+        transformer_weights=None
+    )
+
+    # final scaling
+    pipe = Pipeline([("ct", ct), ("scaler", StandardScaler(with_mean=False))])
+    return pipe
+
+
+def prepare_raw_with_ylag(
+    X: pd.DataFrame,
+    y: pd.Series,
+    lag: int = 1
+) -> pd.DataFrame:
+    """
+    Append y.shift(lag) as a new column 'y_lag{lag}' to X.
+    """
+    X2 = X.copy()
+    X2[f"y_lag{lag}"] = y.shift(lag)
+    return X2
+
+
+def transform_and_align(
+    pipe: Pipeline,
+    X_raw: pd.DataFrame,
+    y: pd.Series
+) -> Tuple[pd.DataFrame, pd.Series]:
+    """
+    Apply `pipe` to X_raw, then drop any rows with NaNs
+    (from lags/deltas), aligning y accordingly.
+    """
+    X_t = pd.DataFrame(pipe.fit_transform(X_raw), index=X_raw.index)
+    mask = X_t.notna().all(axis=1)
+    return X_t.loc[mask], y.loc[mask]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CV SPLITS
+# ─────────────────────────────────────────────────────────────────────────────
+class PurgedWalkForwardCV(BaseCrossValidator):
+    def __init__(self, splits: int = 8, gap: int = 1):
+        self.splits = splits
+        self.gap = gap
+
+    def split(self, X, *_):
+        n = len(X)
+        size = n // (self.splits + 1)
+        for i in range(self.splits):
+            tr_end = size * (i + 1) - self.gap
+            te_start = tr_end + self.gap
+            te_end = min(te_start + size, n)
+            yield np.arange(tr_end), np.arange(te_start, te_end)
+
+    def get_n_splits(self, *_):
+        return self.splits
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# METRICS
+# ─────────────────────────────────────────────────────────────────────────────
+def reg_metrics(y_true, y_pred) -> Dict[str, float]:
+    rmse = mean_squared_error(y_true, y_pred, squared=False)
+    mae = mean_absolute_error(y_true, y_pred)
+    mape = (np.abs((y_true - y_pred) / y_true).mean()) * 100
+    r2 = r2_score(y_true, y_pred)
+    hit = (
+        (np.sign(y_true.diff()) == np.sign(pd.Series(y_pred, index=y_true.index).diff()))
+        .mean()
+    )
+    return dict(RMSE=rmse, MAE=mae, MAPE=mape, R2=r2, HitRatio=hit)
+
+
+def port_metrics(pred, ret) -> Dict[str, float]:
+    sig = np.sign(pred - pred.mean())
+    pnl = sig.shift(1) * ret
+    ann = 12
+    sharpe = np.sqrt(ann) * pnl.mean() / pnl.std(ddof=0)
+    sortino = np.sqrt(ann) * pnl.mean() / pnl[pnl < 0].std(ddof=0)
+    mdd = (pnl.cumsum().cummax() - pnl.cumsum()).max()
+    return dict(Sharpe=sharpe, Sortino=sortino, MaxDD=mdd)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MODEL ZOO
+# ─────────────────────────────────────────────────────────────────────────────
+def gaussian_process() -> GaussianProcessRegressor:
+    kernel = C(1.0, (1e-2, 1e3)) * RBF(length_scale=1.0)
+    return GaussianProcessRegressor(
+        kernel=kernel, n_restarts_optimizer=3, random_state=SEED
+    )
+
+
+MODELS: Dict[str, Callable[[Dict], BaseEstimator]] = {
+    "OLS":      lambda ps: LinearRegression(),
+    "Ridge":    lambda ps: Ridge(**ps),
+    "Lasso":    lambda ps: Lasso(**ps),
+    "Elastic":  lambda ps: ElasticNet(**ps),
+    "BayesR":   lambda ps: BayesianRidge(),
+    "PCR":      lambda ps: Pipeline([
+                    ("sc", StandardScaler()),
+                    ("pca", PCA(0.95)),
+                    ("lr", LinearRegression())
+                 ]),
+    "PLS":      lambda ps: PLSRegression(n_components=ps.get("n_comp", 2)),
+    "SVR":      lambda ps: Pipeline([
+                    ("sc", StandardScaler()),
+                    ("svr", SVR(C=ps["C"], epsilon=0.05))
+                 ]),
+    "GP":       lambda ps: gaussian_process(),
+    "RF":       lambda ps: RandomForestRegressor(
+                    n_estimators=400, min_samples_leaf=2,
+                    random_state=SEED, n_jobs=-1
+                 ),
+    "LGB":      lambda ps: LGBMRegressor(
+                    objective="regression", random_state=SEED,
+                    n_estimators=600, learning_rate=0.04,
+                    subsample=0.8, colsample_bytree=0.8, **ps
+                 ),
+    "XGB":      lambda ps: XGBRegressor(
+                    objective="reg:squarederror", random_state=SEED,
+                    n_estimators=600, learning_rate=0.05,
+                    subsample=0.8, colsample_bytree=0.8, **ps
+                 ),
+    "Cat":      lambda ps: CatBoostRegressor(
+                    loss_function="RMSE", verbose=False,
+                    random_state=SEED, iterations=600,
+                    learning_rate=0.05, depth=6, **ps
+                 ),
+}
+
+
+def stacked_meta() -> StackingRegressor:
+    base = [
+        ("ridge", Ridge(alpha=1.0)),
+        ("lgb", MODELS["LGB"]({})),
+        ("svr", MODELS["SVR"]({"C": 1.0}))
+    ]
+    return StackingRegressor(
+        estimators=base,
+        final_estimator=ElasticNet(alpha=0.01, l1_ratio=0.1),
+        n_jobs=-1,
+        passthrough=True
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VAR BENCHMARK
+# ─────────────────────────────────────────────────────────────────────────────
+class VARBench:
+    def __init__(self, p: int = 6):
+        self.p = p
+
+    def fit(self, X: pd.DataFrame, y: pd.Series):
+        df = X.copy()
+        df[y.name] = y
+        self.m = sm.tsa.VAR(df).fit(maxlags=self.p, ic="aic")
+        return self
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        return self.m.forecast(X.values[-self.m.k_ar:], 1)[:, -1]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHAP DUMP
+# ─────────────────────────────────────────────────────────────────────────────
+def shap_dump(model, X, outdir="explain"):
+    os.makedirs(outdir, exist_ok=True)
+    explainer = shap.Explainer(model, X[:200])
+    sv = explainer(X[:200])
+    shap.summary_plot(sv, X[:200], show=False)
+    shap.save_html(Path(outdir) / "shap.html", sv)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN RUN
+# ─────────────────────────────────────────────────────────────────────────────
+def run(cfg):
+    tic = datetime.now()
+    dl = DataLoader(cfg.x, cfg.y)
+    train, test = dl.split(cfg.holdout)
+
+    ycol = cfg.target
+    Xtr_raw, ytr = train.drop(columns=[ycol]), train[ycol]
+    Xte_raw, yte = test.drop(columns=[ycol]), test[ycol]
+
+    # add 1‑period lag of Y
+    Xtr_raw = prepare_raw_with_ylag(Xtr_raw, ytr, lag=1)
+    Xte_raw = prepare_raw_with_ylag(Xte_raw, yte, lag=1)
+
+    cv = PurgedWalkForwardCV(splits=8, gap=1)
+    records = []
+
+    # loop over feature‑engineering setups
+    for mode in FeatureMode:
+        for sub in SubMode:
+            fe_name = f"{mode.name}__{sub.name}"
+            pipe = get_feature_pipeline(mode, sub)
+
+            # transform & align
+            Xtr, ytr_a = transform_and_align(pipe, Xtr_raw, ytr)
+            Xte, yte_a = transform_and_align(pipe, Xte_raw, yte)
+
+            if len(Xtr) < 10:
+                logging.warning("Skipping %s: too few obs after FE", fe_name)
+                continue
+
+            # classical & regularised linear
+            for name in ["OLS", "Ridge", "Lasso", "Elastic", "BayesR", "PCR", "PLS"]:
+                m = MODELS[name]({"alpha": 1.0} if name == "Ridge" else {})
+                score = cv_score(m, Xtr, ytr_a, cv)
+                records.append({"FE": fe_name, "Model": name, **score})
+
+            # kernel / GP / tree / NN
+            for name, ps in [
+                ("SVR", {"C": 1.0}),
+                ("GP", {}),
+                ("RF", {}),
+                ("LGB", {}),
+                ("XGB", {}),
+                ("Cat", {})
+            ]:
+                m = MODELS[name](ps)
+                score = cv_score(m, Xtr, ytr_a, cv)
+                records.append({"FE": fe_name, "Model": name, **score})
+
+            # neural net
+            m_nn = MLPRegressor(
+                hidden_layer_sizes=(64, 32),
+                max_iter=500,
+                random_state=SEED
+            )
+            records.append({"FE": fe_name, "Model": "NN", **cv_score(m_nn, Xtr, ytr_a, cv)})
+
+            # stacked meta‑learner
+            stack = stacked_meta().fit(Xtr, ytr_a)
+            records.append({"FE": fe_name, "Model": "Stacked", **cv_score(stack, Xtr, ytr_a, cv)})
+
+    # compile leaderboard
+    lb = pd.DataFrame(records).sort_values(["RMSE", "FE", "Model"])
+    lb.to_csv("leaderboard.csv", index=False)
+    logging.info("\n%s", lb.head(20).to_string(index=False))
+
+    # pick best
+    best = lb.iloc[0]
+    best_fe, best_model_name = best.FE, best.Model
+    logging.info("Best FE+Model → %s + %s (RMSE=%.4f)",
+                 best_fe, best_model_name, best.RMSE)
+
+    # rebuild best pipeline & model for full train
+    mode_name, sub_name = best_fe.split("__")
+    best_pipe = get_feature_pipeline(FeatureMode[mode_name], SubMode[sub_name])
+    Xtr_f, ytr_f = transform_and_align(best_pipe, Xtr_raw, ytr)
+    if best_model_name == "NN":
+        final_model = MLPRegressor(
+            hidden_layer_sizes=(64, 32),
+            max_iter=500,
+            random_state=SEED
+        ).fit(Xtr_f, ytr_f)
+    elif best_model_name == "Stacked":
+        final_model = stacked_meta().fit(Xtr_f, ytr_f)
+    else:
+        final_model = MODELS[best_model_name]({}).fit(Xtr_f, ytr_f)
+
+    # hold‑out evaluation
+    Xte_f = pd.DataFrame(best_pipe.transform(Xte_raw), index=Xte_raw.index)
+    mask_te = Xte_f.notna().all(axis=1)
+    Xte_f, yte_f = Xte_f.loc[mask_te], yte.loc[mask_te]
+    yhat = final_model.predict(Xte_f)
+    test_stats = reg_metrics(yte_f, yhat)
+    logging.info("Hold‑out (%s) : %s", best_model_name, test_stats)
+
+    # portfolio metrics
+    port = port_metrics(pd.Series(yhat, index=yte_f.index), yte_f)
+    logging.info("Portfolio metrics : %s", port)
+
+    # save artifacts
+    joblib.dump({
+        "model": final_model,
+        "feat_pipe": best_pipe
+    }, "tp_model.joblib")
+    json.dump({**test_stats, **port}, open("test_report.json", "w"), indent=2)
+
+    # SHAP explain
+    try:
+        shap_dump(final_model, Xtr_f)
+    except Exception as e:
+        logging.warning("SHAP failed: %s", e)
+
+    # VAR benchmark (on original data)
+    var = VARBench().fit(train.drop(columns=[ycol]), ytr)
+    var_pred = var.predict(test.drop(columns=[ycol]))
+    logging.info("VAR RMSE %.4f", mean_squared_error(yte, var_pred, squared=False))
+
+    logging.info("Finished in %s", datetime.now() - tic)
+
+
+def cv_score(model: BaseEstimator, X: pd.DataFrame, y: pd.Series, cv) -> Dict[str, float]:
+    """
+    Return average of reg_metrics across CV folds.
+    """
+    out = []
+    for tr, te in cv.split(X):
+        model.fit(X.iloc[tr], y.iloc[tr])
+        p = model.predict(X.iloc[te])
+        out.append(reg_metrics(y.iloc[te], p))
+    # mean of each metric
+    df = pd.DataFrame(out)
+    return df.mean().to_dict()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Ultimate FE × Model grid search + CV"
+    )
+    parser.add_argument("--x", type=Path, required=True, help="Path to X panel")
+    parser.add_argument("--y", type=Path, required=True, help="Path to Y series")
+    parser.add_argument("--target", type=str, default="Y", help="Name of Y column")
+    parser.add_argument("--holdout", type=int, default=2,
+                        help="Years for out‑of‑sample test")
+    cfg = parser.parse_args()
+    run(cfg)
