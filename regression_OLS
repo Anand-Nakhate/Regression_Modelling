@@ -1,0 +1,144 @@
+import argparse
+import logging
+from pathlib import Path
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import cross_val_score
+
+# ─────────────────────────────────────────
+# Logging & seed
+# ─────────────────────────────────────────
+SEED = 42
+np.random.seed(SEED)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)8s | %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+
+# ─────────────────────────────────────────
+# Data loader
+# ─────────────────────────────────────────
+class DataLoader:
+    def __init__(self, x_path: Path, y_path: Path):
+        self.x = pd.read_parquet(x_path) if x_path.suffix in ['.parquet', '.pq'] else pd.read_csv(x_path, index_col=0, parse_dates=True)
+        self.y = pd.read_parquet(y_path) if y_path.suffix in ['.parquet', '.pq'] else pd.read_csv(y_path, index_col=0, parse_dates=True)
+        self.data = self.x.join(self.y, how='inner').sort_index().ffill().dropna()
+        logging.info(f"Loaded {len(self.data)} obs and {self.x.shape[1]} features.")
+
+    def split(self, holdout_years: int = 2):
+        cut = -12 * holdout_years
+        return self.data.iloc[:cut], self.data.iloc[cut:]
+
+# ─────────────────────────────────────────
+# Transformers
+# ─────────────────────────────────────────
+class Lagger(TransformerMixin, BaseEstimator):
+    def __init__(self, lags=3): self.lags = lags
+    def fit(self, X, y=None): return self
+    def transform(self, X):
+        df = pd.DataFrame({f"{c}_lag{l}": X[c].shift(l)
+                           for c in X.columns for l in range(1, self.lags+1)},
+                          index=X.index)
+        return df
+
+class RollingZ(TransformerMixin, BaseEstimator):
+    def __init__(self, window=36): self.window = window
+    def fit(self, X, y=None): return self
+    def transform(self, X):
+        mu = X.rolling(self.window, min_periods=self.window//2).mean()
+        sd = X.rolling(self.window, min_periods=self.window//2).std(ddof=0)
+        return (X - mu) / sd
+
+class Delta(TransformerMixin, BaseEstimator):
+    def fit(self, X, y=None): return self
+    def transform(self, X): return X.diff()
+
+# ─────────────────────────────────────────
+# Prepare multiple feature pipelines
+# ─────────────────────────────────────────
+def make_pipeline(raw_features, mode):
+    steps = []
+    transformers = []
+    if mode == 'raw':
+        transformers.append(('raw', 'passthrough', raw_features))
+    if mode in ['static_z', 'rz', 'rz_delta', 'rz_lag', 'rz_lag_delta']:
+        if mode == 'static_z':
+            transformers.append(('std', StandardScaler(), raw_features))
+        else:
+            if 'rz' in mode:
+                transformers.append(('rz', RollingZ(window=36), raw_features))
+            if 'lag' in mode:
+                transformers.append(('lag', Lagger(lags=3), raw_features))
+            if 'delta' in mode:
+                transformers.append(('d1', Delta(), raw_features))
+        # collect all generated features
+        remainder = 'drop'
+        ct = ColumnTransformer(transformers, remainder=remainder, n_jobs=-1)
+        steps.append(('features', ct))
+        steps.append(('scale', StandardScaler()))
+    # final estimator
+    steps.append(('ols', LinearRegression()))
+    return Pipeline(steps)
+
+# ─────────────────────────────────────────
+# Evaluation
+# ─────────────────────────────────────────
+def evaluate_pipelines(X, y, modes, cv):
+    results = []
+    for mode in modes:
+        pipe = make_pipeline(X.columns.tolist(), mode)
+        logging.info(f"Evaluating mode: {mode}")
+        neg_rmse = cross_val_score(pipe, X, y, cv=cv,
+                                   scoring='neg_root_mean_squared_error', n_jobs=-1)
+        r2 = cross_val_score(pipe, X, y, cv=cv, scoring='r2', n_jobs=-1)
+        results.append({
+            'mode': mode,
+            'mean_rmse': -np.mean(neg_rmse),
+            'std_rmse': np.std(neg_rmse),
+            'mean_r2': np.mean(r2)
+        })
+    return pd.DataFrame(results)
+
+# ─────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────
+def main():
+    parser = argparse.ArgumentParser(description="OLS Feature Pipeline Comparison")
+    parser.add_argument('--x', required=True, type=Path)
+    parser.add_argument('--y', required=True, type=Path)
+    parser.add_argument('--holdout', type=int, default=2)
+    parser.add_argument('--folds', type=int, default=8)
+    args = parser.parse_args()
+
+    loader = DataLoader(args.x, args.y)
+    train, test = loader.split(args.holdout)
+    Xtr, ytr = train.drop(columns=train.columns[-1]), train.iloc[:, -1]
+
+    # use PurgedWalkForwardCV or simple TimeSeriesSplit
+    from sklearn.model_selection import TimeSeriesSplit
+    cv = TimeSeriesSplit(n_splits=args.folds)
+
+    modes = ['raw', 'static_z', 'rz', 'rz_delta', 'rz_lag', 'rz_lag_delta']
+    df_res = evaluate_pipelines(Xtr, ytr, modes, cv)
+    print(df_res)
+
+    # in-sample final fit
+    best = df_res.sort_values('mean_rmse').iloc[0]['mode']
+    logging.info(f"Best pipeline: {best}")
+    best_pipe = make_pipeline(Xtr.columns.tolist(), best)
+    best_pipe.fit(Xtr, ytr)
+
+    # holdout test
+    Xte, yte = test.drop(columns=test.columns[-1]), test.iloc[:, -1]
+    y_pred = best_pipe.predict(Xte)
+    print("Holdout RMSE:", mean_squared_error(yte, y_pred, squared=False))
+    print("Holdout R2:  ", r2_score(yte, y_pred))
