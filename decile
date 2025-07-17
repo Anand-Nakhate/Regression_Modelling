@@ -1,0 +1,116 @@
+import logging
+from typing import List, Dict
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+
+class DecileForwardAnalysis:
+    """
+    Assign rolling deciles on X, compute forward returns on Y, 
+    and aggregate metrics by decile.
+    """
+    def __init__(self, df: pd.DataFrame, x_col: str, y_col: str, window: int = 252):
+        """
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Must be indexed by date, with columns for X and Y.
+        x_col : str
+            Predictor column name (e.g. 'convenience_yield').
+        y_col : str
+            Target column name (e.g. 'term_premium').
+        window : int
+            Rolling window size in trading days (default 252 ≈ 1 year).
+        """
+        self.df = df.copy()
+        self.x_col = x_col
+        self.y_col = y_col
+        self.window = window
+
+    def assign_deciles(self) -> None:
+        """Compute rolling 10-decile labels of X."""
+        logger.info("Assigning rolling deciles on %s over window %d", self.x_col, self.window)
+        # rank each window, then map to deciles 1–10
+        self.df['decile'] = (
+            self.df[self.x_col]
+            .rolling(self.window, min_periods=self.window)
+            .apply(lambda arr: pd.qcut(arr, 10, labels=False, duplicates='drop')[-1] + 1)
+        )
+
+    def compute_forward_returns(self, horizons: List[int]) -> None:
+        """
+        For each horizon, compute forward change/return for Y.
+        
+        Adds columns: fwd_{h}d for each h in horizons.
+        """
+        logger.info("Computing forward returns for horizons %s", horizons)
+        for h in horizons:
+            col = f"fwd_{h}d"
+            self.df[col] = self.df[self.y_col].pct_change(periods=h).shift(-h)
+    
+    def aggregate_metrics(self, horizons: List[int]) -> pd.DataFrame:
+        """
+        Group by decile and horizon; compute metrics.
+        
+        Returns
+        -------
+        metrics_df : pd.DataFrame
+            MultiIndex (decile, horizon) × metrics columns.
+        """
+        metrics = []
+        for h in horizons:
+            fwd = f"fwd_{h}d"
+            grp = self.df.dropna(subset=['decile', fwd]).groupby('decile')[fwd]
+            metrics.append(
+                pd.DataFrame({
+                    'horizon': h,
+                    'mean': grp.mean(),
+                    'median': grp.median(),
+                    'std': grp.std(),
+                    'hit_rate': grp.apply(lambda x: np.mean(x > 0)),
+                    'sharpe': grp.mean() / grp.std(),
+                    'VaR_5pct': grp.quantile(0.05),
+                })
+            )
+        metrics_df = pd.concat(metrics).reset_index().set_index(['decile','horizon'])
+        logger.info("Aggregated metrics shape: %s", metrics_df.shape)
+        return metrics_df
+
+    def plot_mean_by_decile(self, metrics_df: pd.DataFrame, horizon: int) -> None:
+        """
+        Bar plot of mean ± std for one horizon.
+        """
+        df_h = metrics_df.xs(horizon, level='horizon')
+        plt.figure(figsize=(8, 4))
+        plt.bar(df_h.index, df_h['mean'], yerr=df_h['std'], alpha=0.7)
+        plt.xlabel('Decile of ' + self.x_col)
+        plt.ylabel(f'Mean {self.y_col} return over {horizon}d')
+        plt.title(f'{self.x_col} Deciles → {self.y_col} Forward Return')
+        plt.show()
+
+    def run(self, horizons: List[int]) -> Dict[str, pd.DataFrame]:
+        """
+        Full pipeline: assign deciles, compute forward, aggregate.
+        
+        Returns
+        -------
+        dict with keys:
+            'metrics': metrics DataFrame,
+            'data': cleaned working DataFrame
+        """
+        self.assign_deciles()
+        self.compute_forward_returns(horizons)
+        metrics = self.aggregate_metrics(horizons)
+        return {'metrics': metrics, 'data': self.df}
+
+
+# ─── Example Usage ─────────────────────────────────────────────────────────────
+# df = pd.read_csv('my_data.csv', parse_dates=['date'], index_col='date')
+# analysis = DecileForwardAnalysis(df, x_col='convenience_yield', y_col='term_premium')
+# result = analysis.run(horizons=[1, 5, 20])
+# print(result['metrics'])
+# analysis.plot_mean_by_decile(result['metrics'], horizon=20)
