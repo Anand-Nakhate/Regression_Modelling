@@ -203,3 +203,174 @@ y_te_aligned = y_te.loc[X_te_fe.index]
 # Now you can pass X_tr_fe, y_tr_aligned into your model.fit(),
 # and X_te_fe, y_te_aligned into model.evaluate()/predict() as before.
 
+
+
+from __future__ import annotations
+import argparse, logging, os, warnings
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Tuple
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.linear_model import (
+    LinearRegression, Ridge, Lasso, ElasticNet, BayesianRidge
+)
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# ---------------------------------------------------------------------------
+# GLOBAL SELECTION + FINAL FIT + SUMMARY + ROLLING INFERENCE
+# ---------------------------------------------------------------------------
+def select_and_finalize(
+    df: pd.DataFrame,
+    target_col: str,
+    metrics_df: pd.DataFrame,
+    modes: List[str],
+    train_periods: int,
+    test_periods: int,
+    window_type: str
+):
+    # Aggregate SSE over OOS to pick best config
+    md = metrics_df.copy()
+    md['OOS_SSE'] = md['OOS_RMSE']**2 * md['OOS_n']
+    agg = md.groupby(['Mode','Model','Lags','Delta','Window']).agg(
+        OOS_SSE=('OOS_SSE','sum'), OOS_n=('OOS_n','sum')
+    )
+    agg['Agg_RMSE'] = np.sqrt(agg['OOS_SSE']/agg['OOS_n'])
+    best_cfg = agg['Agg_RMSE'].idxmin()
+    logging.info("Best config: %s -> RMSE %.6f", best_cfg, agg.loc[best_cfg,'Agg_RMSE'])
+
+    # Final full-sample training
+    X_full = df.drop(columns=[target_col])
+    y_full = df[target_col]
+    feat_pipe = build_feature_pipeline(best_cfg[0], best_cfg[2], best_cfg[3], list(X_full.columns))
+    X_fe_full = pd.DataFrame(feat_pipe.fit_transform(X_full), index=X_full.index).dropna()
+    y_fe_full = y_full.reindex(X_fe_full.index)
+    est, grid = LINEAR_MODELS[best_cfg[1]]
+    if grid:
+        cv = TimeSeriesSplit(n_splits=min(5, len(X_fe_full)//2))
+        search = GridSearchCV(est, grid, cv=cv, scoring='neg_root_mean_squared_error', n_jobs=-1)
+        search.fit(X_fe_full, y_fe_full)
+        final_model = search.best_estimator_
+    else:
+        final_model = est.fit(X_fe_full, y_fe_full)
+
+    # Save full-model info
+    params = final_model.get_params()
+    coefs = getattr(final_model, 'coef_', None)
+    intercept = getattr(final_model, 'intercept_', None)
+    with open('final_model_info.txt','w') as f:
+        f.write(f"Config: {best_cfg}\nParams: {params}\nCoefficients: {coefs}\nIntercept: {intercept}\n")
+    logging.info("Full-model information saved.")
+
+    # Rolling-inference summary using statsmodels OLS on each window
+    rolling_recs = []
+    n = len(df)
+    combos = [best_cfg]
+    mode, model_name, use_lags, use_delta, wtype = best_cfg
+    for start in range(train_periods, n - test_periods + 1, test_periods):
+        # Define window indices
+        if window_type == 'expanding':
+            idx_tr = slice(0, start)
+        else:
+            idx_tr = slice(start - train_periods, start)
+        idx_te = slice(start, start + test_periods)
+        train = df.iloc[idx_tr]
+        test = df.iloc[idx_te]
+        X_tr = train.drop(columns=[target_col]); y_tr = train[target_col]
+        X_te = test.drop(columns=[target_col]); y_te = test[target_col]
+        # Features
+        pipe = build_feature_pipeline(mode, use_lags, use_delta, list(X_tr.columns))
+        X_tr_fe = pd.DataFrame(pipe.fit_transform(X_tr), index=X_tr.index).dropna()
+        y_tr_al = y_tr.reindex(X_tr_fe.index)
+        X_te_fe = pd.DataFrame(pipe.transform(X_te), index=X_te.index).dropna()
+        y_te_al = y_te.reindex(X_te_fe.index)
+        if X_tr_fe.empty or X_te_fe.empty:
+            continue
+        # Fit OLS for inference
+        X_sm = sm.add_constant(X_tr_fe)
+        ols = sm.OLS(y_tr_al, X_sm).fit()
+        coef = ols.params.to_dict()
+        pvals = ols.pvalues.to_dict()
+        conf = {k: tuple(v) for k,v in ols.conf_int().iterrows()}
+        # Predict next point: one-step ahead mean
+        pred = final_model.predict(X_te_fe)[0]
+        # Metrics for this window
+        m_in = compute_metrics(y_tr_al.values, final_model.predict(X_tr_fe))
+        m_oos = compute_metrics(y_te_al.values, final_model.predict(X_te_fe))
+        rec = {
+            'TrainEnd': df.index[start],
+            'Coef': coef, 'PValues': pvals, 'ConfInt': conf,
+            'IN_R2': m_in['R2'], 'OOS_R2': m_oos['R2'],
+            'IN_RMSE': m_in['RMSE'], 'OOS_RMSE': m_oos['RMSE'],
+            'Predicted': pred, 'Actual': y_te_al.iloc[0]
+        }
+        rolling_recs.append(rec)
+    rolling_df = pd.DataFrame(rolling_recs)
+    rolling_df.to_json('rolling_inference.json', orient='records', date_format='iso')
+    logging.info("Rolling inference details saved.")
+
+    # Plot full-sample actual vs predicted
+    preds_full = final_model.predict(X_fe_full)
+    plt.figure(figsize=(10,6))
+    plt.plot(y_fe_full.index, y_fe_full, label='Actual')
+    plt.plot(y_fe_full.index, preds_full, label='Predicted')
+    plt.title('Full-sample Actual vs Predicted')
+    plt.legend(); plt.tight_layout(); plt.savefig('full_actual_vs_pred.png')
+    logging.info("Full-sample plot saved.")
+
+    # Plot rolling one-step-ahead predictions
+    dates = rolling_df['TrainEnd'] + pd.to_timedelta(test_periods, unit='D')
+    plt.figure(figsize=(10,6))
+    plt.plot(dates, rolling_df['Actual'], 'o-', label='Actual t+1')
+    plt.plot(dates, rolling_df['Predicted'], 'x--', label='Predicted t+1')
+    plt.title('Rolling One-Step-Ahead Predictions')
+    plt.legend(); plt.tight_layout(); plt.savefig('rolling_preds.png')
+    logging.info("Rolling predictions plot saved.")
+
+# ---------------------------------------------------------------------------
+# ENTRYPOINT
+# ---------------------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser(
+        description='State-of-the-art linear forecasting with walk-forward evaluation'
+    )
+    parser.add_argument('--x', required=True, help='Path to features file')
+    parser.add_argument('--y', required=True, help='Path to target file')
+    parser.add_argument('--target', default='Y', help='Target column name')
+    parser.add_argument('--window', choices=['expanding','rolling'], default='expanding',
+                        help='Window type for walk-forward')
+    parser.add_argument('--train_periods', type=int, default=36,
+                        help='Initial training window length in observations')
+    parser.add_argument('--test_periods', type=int, default=12,
+                        help='Test window length in observations')
+    args = parser.parse_args()
+
+    loader = DataLoader(Path(args.x), Path(args.y))
+    df = loader.load_panel(target_col=args.target, shift_target=True)
+
+    metrics_df = evaluate_all_combinations(
+        df, args.target,
+        modes=['raw','static_z','rolling_z'],
+        train_periods=args.train_periods,
+        test_periods=args.test_periods,
+        window_type=args.window
+    )
+    metrics_df.to_csv('all_metrics.csv', index=False)
+    logging.info("All metrics saved to all_metrics.csv")
+
+    select_and_finalize(df, args.target, metrics_df)
+
+if __name__ == '__main__':
+    main()
+
+
