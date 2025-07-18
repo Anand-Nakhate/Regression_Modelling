@@ -159,3 +159,47 @@ def rolling_weekly_average(
     reversed_data = data.iloc[::-1]
     reversed_avg  = reversed_data.rolling(window=window, min_periods=min_periods).mean()
     return reversed_avg.iloc[::-1]
+
+
+
+from sklearn.pipeline import Pipeline
+import pandas as pd
+
+# … your imports, definitions of fe_pipeline, model, etc.
+
+# 1. Split your raw data as usual:
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=…, random_state=…)
+
+# 2. CONCATENATE train+test for feature‑engineering
+X_combined = pd.concat([X_tr, X_te], axis=0)
+
+# 3. FIT & TRANSFORM the combined set
+#    – fit on all the data (so e.g. any encoders, scalers, imputers see the full range),
+#    – then get a DataFrame back with proper indices & column names:
+fe_pipeline.fit(X_combined)
+X_combined_fe = fe_pipeline.transform(X_combined)
+
+# if your pipeline returns a numpy array, wrap it back into a DataFrame:
+try:
+    feat_names = fe_pipeline.get_feature_names_out()
+except:
+    # fallback: if no get_feature_names_out, just reuse original names
+    feat_names = X_combined.columns
+X_combined_fe = pd.DataFrame(
+    X_combined_fe,
+    index=X_combined.index,
+    columns=feat_names
+)
+
+# 4. SPLIT back into train & test
+#    – use .loc with the original indices so that everything stays aligned
+X_tr_fe = X_combined_fe.loc[X_tr.index]
+X_te_fe = X_combined_fe.loc[X_te.index]
+
+# 5. ALIGN your y’s (just to be safe if you dropped or reordered)
+y_tr_aligned = y_tr.loc[X_tr_fe.index]
+y_te_aligned = y_te.loc[X_te_fe.index]
+
+# Now you can pass X_tr_fe, y_tr_aligned into your model.fit(),
+# and X_te_fe, y_te_aligned into model.evaluate()/predict() as before.
+
