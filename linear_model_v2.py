@@ -77,11 +77,10 @@ class Lagger(TransformerMixin, BaseEstimator):
     def __init__(self, lags: int = 3): self.lags = lags
     def fit(self, X, y=None): return self
     def transform(self, X):
-        df = pd.concat(
-            [X.shift(lag).rename(columns=lambda c: f"{c}_lag{lag}")
+        return pd.concat(
+            [X.shift(lag).rename(lambda c: f"{c}_lag{lag}", axis=1)
              for lag in range(1, self.lags+1)], axis=1
         )
-        return df
 
 class Delta(TransformerMixin, BaseEstimator):
     def fit(self, X, y=None): return self
@@ -152,41 +151,51 @@ def evaluate_all_combinations(
     df: pd.DataFrame,
     target_col: str,
     modes: List[str],
-    train_months: int,
-    test_months: int,
+    train_periods: int,
+    test_periods: int,
     window_type: str
 ) -> pd.DataFrame:
     records = []
     combos = [(m, l, d) for m in modes for l in [False, True] for d in [False, True]]
     n = len(df)
+
     for mode, use_lags, use_delta in combos:
-        for start in range(train_months, n - test_months + 1, test_months):
+        for start in range(train_periods, n - test_periods + 1, test_periods):
+            # define train/test index ranges
             if window_type == 'expanding':
                 idx_tr = slice(0, start)
             else:
-                idx_tr = slice(start - train_months, start)
-            idx_te = slice(start, start + test_months)
+                idx_tr = slice(start - train_periods, start)
+            idx_te = slice(start, start + test_periods)
 
-            train, test = df.iloc[idx_tr], df.iloc[idx_te]
+            train = df.iloc[idx_tr]
+            test = df.iloc[idx_te]
             X_tr, y_tr = train.drop(columns=[target_col]), train[target_col]
             X_te, y_te = test.drop(columns=[target_col]), test[target_col]
-            if y_tr.nunique()<2 or y_te.nunique()<2:
+
+            # build & apply feature pipeline
+            pipe = build_feature_pipeline(mode, use_lags, use_delta, list(X_tr.columns))
+            X_tr_fe = pd.DataFrame(pipe.fit_transform(X_tr), index=X_tr.index).dropna()
+            y_tr_aligned = y_tr.reindex(X_tr_fe.index)
+            X_te_fe = pd.DataFrame(pipe.transform(X_te), index=X_te.index).dropna()
+            y_te_aligned = y_te.reindex(X_te_fe.index)
+
+            # skip windows without data after FE
+            if X_tr_fe.empty or X_te_fe.empty:
                 continue
 
-            pipe = build_feature_pipeline(mode, use_lags, use_delta, list(X_tr.columns))
-            X_tr_fe = pipe.fit_transform(X_tr)
-            X_tr_fe = pd.DataFrame(X_tr_fe, index=X_tr.index).dropna()
-            y_tr_aligned = y_tr.loc[X_tr_fe.index]
-
-            X_te_fe = pipe.transform(X_te)
-            X_te_fe = pd.DataFrame(X_te_fe, index=X_te.index).dropna()
-            y_te_aligned = y_te.loc[X_te_fe.index]
-
             for name, (estimator, grid) in LINEAR_MODELS.items():
-                if grid:
-                    cv = TimeSeriesSplit(n_splits=5)
+                # dynamic grid filtering for PCA/PLS
+                grid_use = {}
+                for param, vals in grid.items():
+                    filtered = [v for v in vals if not isinstance(v, int) or v <= X_tr_fe.shape[1]]
+                    if filtered:
+                        grid_use[param] = filtered
+                # model selection
+                if grid_use:
+                    inner_cv = TimeSeriesSplit(n_splits=min(5, len(X_tr_fe)//2))
                     search = GridSearchCV(
-                        estimator, grid, cv=cv,
+                        estimator, grid_use, cv=inner_cv,
                         scoring='neg_root_mean_squared_error', n_jobs=-1
                     )
                     search.fit(X_tr_fe, y_tr_aligned)
@@ -196,19 +205,20 @@ def evaluate_all_combinations(
                     model = estimator.fit(X_tr_fe, y_tr_aligned)
                     params = {}
 
-                # predictions
-                p_tr = model.predict(X_tr_fe)
-                p_te = model.predict(X_te_fe)
-                ins = compute_metrics(y_tr_aligned.values, p_tr)
-                oos = compute_metrics(y_te_aligned.values, p_te)
+                # metrics
+                preds_tr = model.predict(X_tr_fe)
+                preds_te = model.predict(X_te_fe)
+                ins = compute_metrics(y_tr_aligned.values, preds_tr)
+                oos = compute_metrics(y_te_aligned.values, preds_te)
 
                 rec = {
                     'Mode': mode, 'Model': name,
                     'Lags': use_lags, 'Delta': use_delta,
                     'Window': window_type,
                     'TrainEnd': df.index[start],
-                    **{f"IN_{k}":v for k,v in ins.items()},
-                    **{f"OOS_{k}":v for k,v in oos.items()},
+                    'IN_n': len(y_tr_aligned), 'OOS_n': len(y_te_aligned),
+                    **{f"IN_{k}": v for k, v in ins.items()},
+                    **{f"OOS_{k}": v for k, v in oos.items()},
                     **params
                 }
                 records.append(rec)
@@ -220,45 +230,43 @@ def evaluate_all_combinations(
 def select_and_finalize(
     df: pd.DataFrame,
     target_col: str,
-    metrics_df: pd.DataFrame,
-    train_months: int,
-    window_type: str
+    metrics_df: pd.DataFrame
 ):
-    agg = metrics_df.groupby(['Mode','Model','Lags','Delta','Window'])
-    agg_sse = metrics_df.assign(
-        SSE_in=lambda d: d['IN_RMSE']**2 * (train_months),
-        SSE_oos=lambda d: d['OOS_RMSE']**2 * (d.shape[0] - train_months)
+    # aggregate SSE over OOS
+    md = metrics_df.copy()
+    md['OOS_SSE'] = md['OOS_RMSE']**2 * md['OOS_n']
+    agg = md.groupby(['Mode','Model','Lags','Delta','Window']).agg(
+        OOS_SSE=('OOS_SSE','sum'),
+        OOS_n=('OOS_n','sum')
     )
-    summary = {}
-    # choose best by mean OOS RMSE
-    mean_oos = agg['OOS_RMSE'].mean()
-    best_cfg = mean_oos.idxmin()
-    logging.info("Best config by mean OOS RMSE: %s", best_cfg)
+    agg['Agg_RMSE'] = np.sqrt(agg['OOS_SSE'] / agg['OOS_n'])
+    best_cfg = agg['Agg_RMSE'].idxmin()
+    logging.info("Best config by aggregated OOS RMSE: %s -> %.6f", best_cfg, agg.loc[best_cfg,'Agg_RMSE'])
 
-    # final training
-    df_train = df.copy()
-    X_full = df_train.drop(columns=[target_col])
-    y_full = df_train[target_col]
-    pipe = build_feature_pipeline(
-        best_cfg[0], best_cfg[2], best_cfg[3], list(X_full.columns)
-    )
-    X_fe = pipe.fit_transform(X_full)
-    X_fe = pd.DataFrame(X_fe, index=X_full.index).dropna()
-    y_al = y_full.loc[X_fe.index]
+    # final training on full dataset
+    df_full = df.copy()
+    X_full = df_full.drop(columns=[target_col])
+    y_full = df_full[target_col]
 
-    estimator, grid = LINEAR_MODELS[best_cfg[1]]
+    pipe = build_feature_pipeline(best_cfg[0], best_cfg[2], best_cfg[3], list(X_full.columns))
+    X_fe = pd.DataFrame(pipe.fit_transform(X_full), index=X_full.index).dropna()
+    y_al = y_full.reindex(X_fe.index)
+
+    est, grid = LINEAR_MODELS[best_cfg[1]]
     if grid:
-        cv = TimeSeriesSplit(n_splits=5)
+        cv = TimeSeriesSplit(n_splits=min(5, len(X_fe)//2))
         search = GridSearchCV(
-            estimator, grid, cv=cv,
+            est, grid, cv=cv,
             scoring='neg_root_mean_squared_error', n_jobs=-1
         )
         search.fit(X_fe, y_al)
         final_model = search.best_estimator_
-        logging.info('Final model params: %s', search.best_params_)
+        logging.info('Final model %s params: %s', best_cfg[1], search.best_params_)
     else:
-        final_model = estimator.fit(X_fe, y_al)
-    # coef & params
+        final_model = est.fit(X_fe, y_al)
+        logging.info('Final model %s without hyperparams', best_cfg[1])
+
+    # save model details
     params = final_model.get_params()
     coefs = getattr(final_model, 'coef_', None)
     intercept = getattr(final_model, 'intercept_', None)
@@ -266,19 +274,19 @@ def select_and_finalize(
         f.write(f"Params: {params}\nCoefficients: {coefs}\nIntercept: {intercept}\n")
     logging.info("Saved final model info to final_model_info.txt")
 
-    # summary via statsmodels
+    # statsmodels summary for inference
     X_sm = sm.add_constant(X_fe)
     smm = sm.OLS(y_al.values, X_sm).fit()
     with open('model_summary.txt','w') as f:
         f.write(str(smm.summary()))
     logging.info("Saved model summary to model_summary.txt")
 
-    # plot actual vs pred at t+1
+    # plot actual vs predicted at t+1
     preds = final_model.predict(X_fe)
-    preds = pd.Series(preds, index=X_fe.index)
+    preds_series = pd.Series(preds, index=X_fe.index)
     plt.figure(figsize=(10,6))
     plt.plot(y_al.index, y_al, label='Actual (t+1)')
-    plt.plot(preds.index, preds, label='Predicted (t+1)')
+    plt.plot(preds_series.index, preds_series, label='Predicted (t+1)')
     plt.title('Actual vs Predicted')
     plt.legend()
     plt.tight_layout()
@@ -295,33 +303,28 @@ def main():
     parser.add_argument('--x', required=True, help='Path to features file')
     parser.add_argument('--y', required=True, help='Path to target file')
     parser.add_argument('--target', default='Y', help='Target column name')
-    parser.add_argument('--window', choices=['expanding','rolling'], default='expanding')
-    parser.add_argument('--train_years', type=int, default=3, help='Initial training window in years')
-    parser.add_argument('--test_months', type=int, default=12, help='Test window in months')
+    parser.add_argument('--window', choices=['expanding','rolling'], default='expanding',
+                        help='Window type for walk-forward')
+    parser.add_argument('--train_periods', type=int, default=36,
+                        help='Initial training window length in observations')
+    parser.add_argument('--test_periods', type=int, default=12,
+                        help='Test window length in observations')
     args = parser.parse_args()
 
     loader = DataLoader(Path(args.x), Path(args.y))
     df = loader.load_panel(target_col=args.target, shift_target=True)
-    train_months = args.train_years * 12
 
-    # evaluate all combos
     metrics_df = evaluate_all_combinations(
         df, args.target,
         modes=['raw','static_z','rolling_z'],
-        train_months=train_months,
-        test_months=args.test_months,
+        train_periods=args.train_periods,
+        test_periods=args.test_periods,
         window_type=args.window
     )
     metrics_df.to_csv('all_metrics.csv', index=False)
     logging.info("All metrics saved to all_metrics.csv")
 
-    # select best and finalize
-    select_and_finalize(
-        df, args.target,
-        metrics_df,
-        train_months=train_months,
-        window_type=args.window
-    )
+    select_and_finalize(df, args.target, metrics_df)
 
 if __name__ == '__main__':
     main()
