@@ -114,3 +114,48 @@ class DecileForwardAnalysis:
 # result = analysis.run(horizons=[1, 5, 20])
 # print(result['metrics'])
 # analysis.plot_mean_by_decile(result['metrics'], horizon=20)
+
+
+
+import pandas as pd
+from typing import Union
+
+def rolling_weekly_average(
+    data: Union[pd.Series, pd.DataFrame],
+    window: Union[int, str] = '7D',
+    min_periods: int = 1,
+    forward: bool = False
+) -> Union[pd.Series, pd.DataFrame]:
+    """
+    Compute rolling weekly average over a Series or DataFrame.
+
+    Parameters
+    ----------
+    data : pd.Series or pd.DataFrame
+        Time‑indexed data to roll over.
+    window : int or str, default '7D'
+        - If int, number of periods (rows) in the window.
+        - If str, a pandas offset alias (e.g. '7D' for 7 calendar days,
+          '1W' for 1 week, etc.).
+    min_periods : int, default 1
+        Minimum number of observations in window required to have a value.
+    forward : bool, default False
+        If False, compute backward‑looking (t‑window → t) average.
+        If True, compute forward‑looking (t → t+window) average.
+
+    Returns
+    -------
+    pd.Series or pd.DataFrame
+        The same shape as `data`, with rolling averages.
+    """
+    if not isinstance(data, (pd.Series, pd.DataFrame)):
+        raise TypeError("`data` must be a pandas Series or DataFrame")
+
+    # Backward‑looking is just pandas.rolling().mean()
+    if not forward:
+        return data.rolling(window=window, min_periods=min_periods).mean()
+
+    # Forward‑looking: reverse the index order, roll, then reverse back
+    reversed_data = data.iloc[::-1]
+    reversed_avg  = reversed_data.rolling(window=window, min_periods=min_periods).mean()
+    return reversed_avg.iloc[::-1]
