@@ -430,3 +430,48 @@ def plot_horizontal_gauge(series, title='Convenience Factor Gauge'):
 # Usage example (replace `your_series` with your pandas Series):
 # plot_horizontal_gauge(your_series, title='My Convenience Gauge')
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+# ← Replace this with your actual DataFrame:
+# If your DataFrame is named `metrics_df`, use:
+# df = metrics_df
+# Or if you have a dict `result` containing it under 'metrics', use:
+# df = result['metrics']
+df = your_dataframe_here  
+
+# Pivot the "mean" metric into a table: index=quintile, columns=horizon
+pivot = (
+    df['mean']                    # Select the mean column
+      .unstack(level='horizon')  # Move horizon into columns
+      .loc[:, [21, 63, 126]]     # Keep only the three horizons
+)
+
+# Plot
+fig, ax = plt.subplots(figsize=(6, 4))
+heat = ax.imshow(pivot.values, aspect='auto')
+
+# Axis labels
+ax.set_xticks(np.arange(pivot.shape[1]))
+ax.set_xticklabels(pivot.columns)
+ax.set_yticks(np.arange(pivot.shape[0]))
+ax.set_yticklabels(pivot.index.astype(int))
+
+# Annotate with numeric values
+for i in range(pivot.shape[0]):
+    for j in range(pivot.shape[1]):
+        ax.text(
+            j, i,
+            f"{pivot.iloc[i, j]:.4f}",
+            ha='center', va='center'
+        )
+
+ax.set_xlabel('Horizon (Days)')
+ax.set_ylabel('Quintile')
+ax.set_title('Mean by Quintile and Horizon')
+
+# Colorbar
+plt.colorbar(heat, ax=ax, fraction=0.046, pad=0.04)
+
+plt.tight_layout()
+plt.show()
