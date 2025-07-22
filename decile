@@ -374,3 +374,80 @@ if __name__ == '__main__':
     main()
 
 
+
+
+def plot_convenience_speedometer(convenience_series, title='Convenience Factor Gauge'):
+    """
+    Plots a speedometer-style gauge for the given convenience factor series.
+    - Green zone: values above +1 std
+    - White zone: values within ±1 std
+    - Red zone: values below -1 std
+    """
+    # Clean data and compute statistics
+    data = convenience_series.dropna().values
+    current = data[-1]
+    μ = data.mean()
+    σ = data.std(ddof=0)
+    v_min, v_max = data.min(), data.max()
+
+    # Angle mapping: v_min -> -90°, v_max -> +90°
+    def val_to_angle(v):
+        return -90 + 180 * (v - v_min) / (v_max - v_min)
+
+    # Gauge setup
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.axis('equal')
+    ax.set_axis_off()
+    ax.set_title(title, pad=20)
+
+    # Zone boundaries
+    low_thresh = max(v_min, μ - σ)
+    high_thresh = min(v_max, μ + σ)
+
+    # Draw colored arcs
+    zones = [
+        (v_min, low_thresh, 'red'),
+        (low_thresh, high_thresh, 'white'),
+        (high_thresh, v_max, 'green'),
+    ]
+    for start_val, end_val, color in zones:
+        wedge = Wedge(
+            (0, 0), 
+            1, 
+            val_to_angle(start_val), 
+            val_to_angle(end_val), 
+            width=0.3, 
+            facecolor=color, 
+            edgecolor='black'
+        )
+        ax.add_patch(wedge)
+
+    # Draw the needle
+    needle_angle = np.deg2rad(val_to_angle(current))
+    ax.plot(
+        [0, 0.8 * np.cos(needle_angle)], 
+        [0, 0.8 * np.sin(needle_angle)], 
+        lw=3, 
+        color='black'
+    )
+    ax.add_patch(Circle((0, 0), 0.05, facecolor='black'))
+
+    # Annotate current value
+    ax.text(0, -0.2, f"Current: {current:.2f}", ha='center', va='center', fontsize=12)
+
+    # Optionally, label thresholds
+    for lbl_val in [v_min, μ - σ, μ, μ + σ, v_max]:
+        angle = np.deg2rad(val_to_angle(lbl_val))
+        x, y = 1.1 * np.cos(angle), 1.1 * np.sin(angle)
+        label = {
+            v_min: f"{v_min:.2f}",
+            μ - σ: f"μ - σ = {μ - σ:.2f}",
+            μ: f"μ = {μ:.2f}",
+            μ + σ: f"μ + σ = {μ + σ:.2f}",
+            v_max: f"{v_max:.2f}"
+        }[lbl_val]
+        ax.text(x, y, label, ha='center', va='center', fontsize=9)
+
+    plt.show()
+
+
