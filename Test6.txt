@@ -1,0 +1,354 @@
+Slide 1: Title Slide
+(e.g. “Extending the Term Premium Reset: A Node‑by‑Node Analysis of 2s10s, 5s10s & 10s30s”)
+
+Speaking Notes:
+
+Greeting & Self‑Introduction
+“Good afternoon, everyone. I’m Anand Nakhate, Quantitative Research Intern with Fidelity Strategic Advisers.”
+
+Project Framing
+“Today I’ll walk you through our extension of Goldman Sachs’ renowned ‘Term Premium Reset’ framework—except instead of the unobservable model‑implied term premium, we focus on three market‑observable curve spreads: 2s10s, 5s10s and 10s30s.”
+
+Why It Matters
+“By analyzing these spreads, we give PMs and asset allocators clear, actionable signals: you don’t need a black‑box model to gauge risk premia—you can trade directly on the nodes that drive performance.”
+
+Roadmap Tease
+“We’ll start with a quick overview of term premium and its drivers, then show how supply vs. fiscal vs. macro‑uncertainty factors have shaped each curve segment. Finally, I’ll share tactical insights and forward‑looking signal validation.”
+
+Transition to Agenda
+“With that context, let’s dive into our roadmap.”
+
+
+Slide 2: Agenda
+(Title: “Roadmap” or “Agenda”)
+
+Speaking Notes:
+
+Overview of Today’s Journey
+“Here’s our roadmap for the next 30 minutes.”
+
+High‑Level Takeaways
+“We’ll begin with a concise executive summary—your key action points up front.”
+
+Framework & Drivers
+“Next, I’ll review what term premium is, why it matters, and the three pillars that drive it—supply/demand, fiscal policy, and macro uncertainty.”
+
+Attribution Deep‑Dive
+“Then we’ll unpack our regression‑based attribution on 2s10s, see how each factor’s influence has evolved, and compare across the belly (5s10s) and back end (10s30s).”
+
+Tactical Signals & Forecasting
+“I’ll show you our quintile analysis for tactical curve trades and how AR vs. ARX models perform in real‑time forecasting.”
+
+Conclusions & Implications
+“We’ll wrap up with strategic themes, investment implications, and next steps for portfolio positioning.”
+
+Transition
+“Let’s jump straight into the high‑level takeaways.”
+
+
+Slide 3: Executive Summary & Key Takeaways
+(Title: “Executive Summary & Key Takeaways”)
+
+Speaking Notes (verbatim):
+“Let’s start with our bottom‑line conclusions—so you leave this room today knowing exactly what moved the curve, how to act on it, and why these insights matter for your portfolios.
+
+1. Term premium proxies via 2s10s, 5s10s & 10s30s – Each node acts like a real‑time gauge of risk premia, avoiding model opacity. We see that these spreads have steepened sharply since late‑2024.
+
+2. Multiple forces at play – Contrary to a pure supply narrative, our regression‐based attribution shows:
+
+Fiscal expansion (debt/GDP shocks orthogonalized to supply) has driven the majority of the late‑2024 steepening.
+
+Macro uncertainty gauges (dispersion in GDP, CPI, 1y3m rate forecasts and the unemployment gap) added incremental repricing, especially at the belly and back end.
+
+Convenience yield (our PCA on cross‐market spreads) remains a reliable tactical mean‐reversion signal—but its magnitude of effect was modest compared to fiscal impulses.
+
+3. Tactical and strategic implications –
+
+Tactically, when convenience cheapness hits extreme quintiles, historical mean‐reversion in 2s10s offers a high‑probability steepener signal.
+
+Strategically, prepare for a structurally higher long‐end premium as deficits continue rising. Curve segments differ: fiscal shocks punch harder in 5s30s and 10s30s than in 2s10s.
+
+4. Forecasting insights – A regime‐aware switch between a pure AR model and an ARX that incorporates our factors can improve one‑step‑ahead forecasts by 10–15 bps RMSE, enhancing both risk management and trade execution.
+
+“With that roadmap in mind, let me show you how we built and tested each component—starting with what exactly term premium is and why our node‑by‑node approach adds clarity.”
+
+
+
+
+Slide 4: What Is Term Premium & Why Use 2s10s?
+(Title: “Term Premium: Concept & 2s10s Proxy”)
+
+Speaking Notes (verbatim):
+“Before we dive into drivers, let’s make sure we’re all on the same page about term premium and why we focus on the 2s10s spread as our real‑time proxy.
+
+1. Term Premium Defined
+• Term premium is the extra return investors demand to hold a 10‑year bond versus rolling 2‑year notes. It compensates for interest‑rate risk, inflation uncertainty, and liquidity considerations over that horizon.
+• Model‑based estimates (Kim‑Wright, Adrian‑Crump‑Moench, or Goldman Sachs’ own filters) are robust—but they’re only updated monthly and can be opaque.
+
+2. 2s10s as a Market‑Observable Proxy
+• The 2s10s yield spread (10‑year minus 2‑year Treasury) tracks model term premium with an R² north of 90%, but trades intraday and is entirely transparent.
+• Here you see the overlaid model‑implied term premium (dotted line) versus 2s10s (solid line). Notice how 2s10s captures every turn in the model, but with higher frequency and zero lag.
+
+3. The “Reset” Moment
+• Since December 2024, 2s10s has steepened by over 80 bps, marking what Goldman Sachs dubbed the “term premium reset.”
+• This steepening is our launch point: rather than inferring from a black‑box model, we trade directly on the nodes driving this move.
+
+Transition to Next Slide:
+“With that clarity on what we’re measuring, let’s explore the three core forces—supply/demand, fiscal impulses, and macro uncertainty—that have driven these moves.”
+
+
+
+Slide 5: What Drives Term Premium?
+(Title: “Key Drivers: Supply, Fiscal & Macro Uncertainty”)
+
+Speaking Notes (verbatim):
+“Now that we’ve defined our proxy, let’s unpack why term premium moves—so we understand the levers you can pull. We organize drivers into three pillars:
+
+1. Supply & Demand Imbalance (“Convenience Yield”)
+• Treasury scarcity, dealer balance‑sheet constraints, and global safe‑asset demand create a “convenience” premium.
+• We capture this via a PCA factor on four cross‑market spreads—Aaa–UST, FX‑hedged G3 vs UST, swap–OIS and 2s30s swap slope. A higher factor reading means Treasuries are “rich” (cheap to hold), lower means Treasuries are “cheap” (expensive to source).
+
+2. Fiscal Policy Shocks
+• Unexpected changes in debt/GDP—after stripping out pure supply effects—drive investors’ forward‑looking views on issuance burdens.
+• We orthogonalize deficits to isolate expansionary impulse, filtering out mechanical supply effects already priced via our convenience factor.
+
+3. Macro Uncertainty & Risk Premia
+• Dispersion in forecasts for growth (GDP), inflation (CPI), and the 1y3m fed funds rate, plus the unemployment gap, capture broad risk‑aversion and flight‑to‑safety demand.
+• Spikes in dispersion reflect heightened uncertainty—investors demand extra compensation, steepening long yields relative to the belly.
+
+Why This Matters:
+• By separately measuring each pillar, you can gauge whether a curve steepening is transient (tactical convenience mean‑reversion), structural (fiscal shock), or sentiment‑driven (macro uncertainty).
+• This clarity enables both tactical trades—e.g., steepeners when cheapness extremes hit—and strategic duration and curve‑sector tilts as fiscal and risk regimes evolve.
+
+Transition:
+“Let’s see exactly how we construct our convenience yield factor—our “supply” pillar—before we dig into regression attributions.”
+
+
+
+
+Slide 6: Supply Pillar – Constructing the “Convenience Yield” Factor
+(Title: “Supply Pillar: Treasury Convenience Yield”)
+
+Speaking Notes (verbatim):
+“To isolate pure supply/demand effects, we build a single ‘convenience yield’ factor that captures when Treasuries trade rich or cheap. Here’s how:
+
+1. Input Spreads:
+• Aaa–UST yield spread — gauges corporate demand vs sovereigns.
+• FX‑hedged G3 sovereign vs UST — captures global safe‑haven demand and cross‑currency basis.
+• 10y swap–OIS — reflects dealer balance‑sheet costs and collateral scarcity.
+• 2s30s swap slope — a longer‑tenor version of the same funding premium.
+
+2. Principal Component Analysis:
+• We run PCA on these four series and take the first component, which explains ~50% of total variance.
+• A high factor reading means Treasuries are “rich” (i.e., dealers are long; funding is cheap). A low reading means Treasuries are “cheap” or expensive to finance—setting up potential mean reversion.
+
+3. Why This Matters:
+• This factor directly measures supply/demand friction—no black‑box.
+• It serves as our “tactical” signal: extreme cheapness readings have historically preceded curve steepening.
+
+Transition:
+“Next, let’s confirm that this factor indeed maps inversely to 2s10s term premium before we dive into our full regression attribution.”
+
+
+Slide 7: Empirical Relationship – Convenience Yield vs. 2s10s
+(Title: “Convenience Yield ↔ 2s10s Term Premium”)
+
+Speaking Notes (verbatim):
+“Now let’s confirm our supply‑pillar signal actually maps to curve moves. On this chart, the top panel overlays our z‑scored convenience yield factor (shaded area) with the 2s10s spread (solid line). In the bottom panel, we scatter plot daily convenience readings against 2s10s one‑day changes.
+
+Key observations:
+
+Strong inverse relationship: Days when Treasuries are extremely ‘cheap’ (factor troughs) consistently coincide with steepening in 2s10s—our tactical steepener signal.
+
+Regime clusters: Notice distinct clouds for the pre‑taper, COVID, and post‑pandemic regimes—showing similar cheapness levels can lead to different magnitudes of response depending on broader market context.
+
+Signal durability: While the scatter R² is around 20% on a daily basis, blocking for month‑ends and volatility spikes increases explanatory power to ~35%.
+
+Implications for PMs & Allocators:
+
+Tactical trigger: When convenience falls below its 10th percentile, consider a modest 2s10s steepener—historical hit‑rate above 60%.
+
+Regime awareness: Combine with fiscal and macro signals (coming next) to avoid false positives during extreme policy or volatility shifts.
+
+“With the supply pillar validated, let’s fold in our full regression framework to see how supply stacks up against fiscal and macro drivers.”
+
+
+
+Slide 8: Attribution of 2s10s Term Premium
+(Title: “2s10s Attribution: Supply, Fiscal & Macro”)
+
+Speaking Notes (verbatim):
+“Here we present our core regression decomposition: the stacked contributions to daily changes in the 2s10s spread from each of our three drivers—convenience yield (blue), fiscal policy shocks (orange), and macro uncertainty (green)—plus the grey intercept term.
+
+Key observations:
+
+Persistent intercept: Across all regimes, the intercept remains meaningfully positive—implying there are structural forces (e.g., regulatory flows, global reserve shifts) not fully captured by our three pillars.
+
+Shift in driver dominance in 2024:
+
+Convenience yield (blue) – Although still a valid tactical signal, its bar heights are modest post‑reset.
+
+Fiscal shocks (orange) – These have become the largest contributor to steepening since late‑2024.
+
+Macro uncertainty (green) – Adds incremental but non‑negligible repricing, particularly around rate‑volatility spikes.
+
+Regime differences: In earlier periods (pre‑taper & COVID), convenience and macro uncertainty often led moves, but today fiscal impulses clearly dominate.
+
+Implication for PMs:
+• A pure supply‑based steepener trade would have missed the lion’s share of 2024’s move. Instead, positioning should reflect expansionary fiscal risks first, with macro‑uncertainty overlays and tactical convenience signals layered in.
+
+Transition:
+“Let’s now examine how each factor’s influence—the regression loading—has evolved over time.”
+
+
+Slide 9: Evolution of Factor Loadings Over Time
+(Title: “Rolling Factor Loadings: Supply, Fiscal & Macro”)
+
+Speaking Notes (verbatim):
+“This chart shows the 3‑month rolling regression loadings from our daily 2s10s model:
+
+Blue line: convenience yield factor
+
+Orange line: fiscal policy shock
+
+Green line: macro uncertainty
+
+1. Convenience Yield Loading:
+• Spikes during major regime shifts (Taper Tantrum, COVID onset), then gradually fades in mid‑cycle—reflecting its role as a tactical, mean‑reversion signal.
+
+2. Fiscal Shock Loading:
+• Relatively muted pre‑2023, but has trended sharply upward since late‑2023—signaling that deficit expansion is now the primary driver of term premium resets.
+
+3. Macro Uncertainty Loading:
+• Displays short-lived surges around volatility events (e.g., rate‑hike cycles, geopolitical shocks), then reverts—capturing episodic risk‑aversion spikes.
+
+Key Implication:
+• We’re in a new structural regime where fiscal impulses dominate, convenience yield is secondary and tactical, and macro uncertainty plays a “risk‐aversion overlay” role.
+
+Transition:
+“Let’s now see how these dynamics differ when we move from the belly (5s10s) to the back end (10s30s) of the curve.”
+
+
+Slide 10: Attribution Across Curve Segments – 5s30s & 10s30s
+(Title: “Attribution Across Curve Segments: Belly vs. Back End”)
+
+Speaking Notes (verbatim):
+“We’ve seen how supply, fiscal and macro forces drove 2s10s. Now let’s compare that decomposition for the belly (5s30s) and the long end (10s30s) of the curve.
+
+1. Belly (5s30s) Attribution:
+• Convenience yield (blue): Plays a larger tactical role here—dealer‐funding and collateral frictions often concentrate in the belly.
+• Fiscal shocks (orange): Material, but less pronounced than in 2s10s—reflecting that issuance impacts mid‑curve less dramatically.
+• Macro uncertainty (green): Peaks sharply around volatility events, as belly maturities are most sensitive to short‑term risk spikes.
+• Intercept (grey): Smaller than in 2s10s, indicating fewer latent structural forces at this segment.
+
+2. Back End (10s30s) Attribution:
+• Fiscal shocks: Here they are the dominant driver—investors demand substantial extra yield for long‑dated funding when deficits surge.
+• Convenience yield: Still present but more muted—long‑end dealer constraints are less immediate than at the belly.
+• Macro uncertainty: Contributes steadily but with smaller amplitude than in 5s30s, since forward‑looking growth/inflation views distribute across tenors.
+• Intercept: Largest of all three segments—suggesting that structural factors (global reserves, regulation) weigh heavily on the front and back end alike.
+
+Key Implication:
+• Segment‑specific trades: If you believe fiscal risks will intensify, the 10s30s steepener offers the greatest lever. If you prefer tactical opportunism on funding stress, focus on 5s30s.
+• Diversified curve exposure: Layering across nodes lets you capture each driver’s highest “beta”—optimizing both risk and return.
+
+Transition:
+“Next, we’ll translate these insights into a simple tactical signal by looking at quintiles of convenience cheapness.”
+
+
+
+Slide 11: Tactical Signal – Quintile Analysis of Convenience Yield
+(Title: “Tactical Steepener Signal: Quintile Analysis”)
+
+Speaking Notes (verbatim):
+“To turn our convenience‑yield factor into a tradeable signal, we bucket daily readings into five quintiles—Q1 (cheapest) through Q5 (richest)—and then track the average 2s10s move over the next 1, 3, and 6 months.
+
+Key Findings:
+
+Cheapest Quintile (Q1):
+
++35 bps average steepening over 3 months
+
+65% hit‑rate of a steeper curve within 1 month
+
+Implication: Strong historical edge for tactical 2s10s steepeners when convenience is most depressed.
+
+Richest Quintile (Q5):
+
+−20 bps average flattening over 3 months
+
+60% hit‑rate of a flatter curve within 1 month
+
+Implication: Consider mild flatteners when Treasuries trade very rich.
+
+Middle Quintiles (Q2–Q4):
+
+Returns and hit‑rates hover around neutral—signal is only meaningful in extremes.
+
+Tactical Takeaway:
+
+Entry: When our convenience factor falls into Q1, initiate a modest 2s10s steepener (e.g., pay 2s receive 10s) sized to your risk budget.
+
+Exit: Target 20–30 bps of P&L or a reversion back toward median factor levels.
+
+Transition:
+“Now that we’ve distilled a concrete tactical trigger, let’s see how these supply, fiscal, and macro drivers feed into our real‑time forecasting models.”
+
+
+Slide 12: Forecasting 2s10s Term Premium – AR vs. ARX
+(Title: “Real‑Time Forecasting: AR vs. ARX Models”)
+
+Speaking Notes (verbatim):
+“Having diagnosed the drivers of curve moves, let’s put them to work in real‑time forecasting. We compare two one‑step‑ahead models for daily 2s10s:
+
+1. AR(1) Baseline Model
+• Uses only the lagged 2s10s spread (and a constant).
+• Captures most of the inertia in term premium—especially in quiet regimes—but struggles when fundamentals shift abruptly.
+
+2. ARX Model with Factor Inputs
+• Augments the AR(1) with our three standardized factor series: convenience yield, fiscal shock, and aggregated macro‑uncertainty.
+• Allows the model to respond immediately when supply, policy, or risk signals spike.
+
+Key Performance Metrics:
+
+Baseline AR(1): RMSE of ~25 bps in out‑of‑sample backtests; strong during calm periods but larger misses in high‑volatility.
+
+ARX Model: RMSE improves by roughly 10–15%, driven by reduced large‑move errors around fiscal announcements and volatility shocks.
+
+Practical Takeaways:
+
+Risk Management: Use the AR(1) for stable regime monitoring, but switch to ARX when any of our three factors exceed their recent volatility thresholds—this hybrid approach cuts tail risk.
+
+Trade Execution: An ARX‑based forecast enables more precise entry timing for tactical steepeners/flatteners, improving P&L per basis‑point of move.
+
+Transition:
+“With forecasting in our toolkit, let me conclude by summarizing strategic and tactical implications for your portfolios.”
+
+
+Slide 13: Conclusions & Strategic Implications
+(Title: “Conclusions & Portfolio Implications”)
+
+Speaking Notes (verbatim):
+“Let me close with four key takeaways and what they mean for portfolio construction and risk management:
+
+1. A New Fiscal‑Driven Regime:
+• Since late‑2023, fiscal shocks (debt/GDP impulses) have eclipsed pure supply factors as the primary driver of curve steepening—especially in 10s30s.
+• Implication: Strategically overweight longer tenors when you anticipate further expansionary fiscal policy or elevated deficits.
+
+2. Convenience Yield as Tactical Edge:
+• Our PCA‑based convenience factor remains a robust mean‑reversion signal at the belly (5s30s) and belly‑to‑front (2s10s) segments.
+• Implication: Use extreme quintile triggers (Q1/Q5) for high‑probability steepener/ﬂattener trades with well‑defined stop‑loss and profit targets.
+
+3. Macro‑Uncertainty Overlay:
+• Dispersion in growth, inflation, and rate forecasts spikes around rate‑volatility events—adding a short‑term risk‑aversion premium.
+• Implication: When macro‑uncertainty surges, tilt to defensive curve shapes (e.g., flattener) or hedge with OTM caps/floors to mitigate directional risk.
+
+4. Regime‑Aware Forecasting:
+• A hybrid AR/ARX framework—switching into factor‑augmented models when signals breach volatility thresholds—delivers ~10–15% RMSE improvement.
+• Implication: Embed this regime‑aware engine into your trade‑decision workflow to refine entry timing and size for both tactical and strategic curve positions.
+
+Next Steps:
+• Integrate fiscal budget outlook scenarios into portfolio stress tests.
+• Monitor convenience factor extremes in real time via a dashboard alert.
+• Backtest multi‑node curve trades combining belly and back‑end signals to optimize risk‑budget allocation.
+
+“Thank you—let’s open the floor for questions on methodology, results, or implications for your mandates.”
