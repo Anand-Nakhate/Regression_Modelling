@@ -74,3 +74,19 @@ r_t &= \text{Consensus Dispersion in Forecast for Forward Short Rate}_t \\
 \end{frame}
 
 \end{document}
+
+
+
+
+
+
+\[
+\begin{aligned}
+y^{\rm hedged}_t 
+&= y^{\rm local}_t 
+  + \bigl(y^{\rm USD\text{-}OIS}_t - y^{\rm FX\text{-}OIS}_t\bigr)
+  + \underbrace{\Bigl(\mathrm{FPct}_t - \bigl(y^{\rm USD\text{-}OIS}_t - y^{\rm FX\text{-}OIS}_t\bigr)\Bigr)}_{\text{CIP basis}}\\
+%
+&= y^{\rm local}_t \;+\;\mathrm{FPct}_t
+\end{aligned}
+\]
