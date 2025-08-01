@@ -1,0 +1,76 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}  % for alignment of numerical columns
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+
+\title{\textbf{Polynomial, Piecewise, and Ridge Models for the U.S.\ Treasury Curve:}}
+\author{University of Chicago Project Lab | Piper Sandler}
+\date{\today}
+
+\begin{document}
+\maketitle
+\begin{frame}{Model Equations: Attribution \& Convenience Yield}
+
+\textbf{1. Convenience Yield Construction}  
+\vspace{0.3em}
+\[
+\begin{aligned}
+S_{1,t} &= y^{\rm Aaa}_{t} \;-\; y^{\rm UST10}_{10y,t} 
+  &&\text{(Aaa vs. 10 UST spread)}\\
+S_{2,t} &= \tfrac{1}{3}\sum_{j\in\{\rm GBP,EUR,JBP\}}\bigl(y^{\rm sov}_{10y,j,t}-y^{\rm UST10}_{t}\bigr)
+  &&\text{(FX-hedged G3 sovereign vs. UST)}\\
+S_{3,t} &= y^{\rm swap10y\!-\!\rm OIS}_{t}
+  &&\text{(10y swap–OIS spread)}\\
+S_{4,t} &= y^{\rm swap2s30s}_{t}
+  &&\text{(2s30s swap spread)}\\[0.5em]
+\tilde S_{i,t} &= \frac{S_{i,t}-\mu_i}{\sigma_i}
+  \quad(i=1,\dots,4)\\[0.5em]
+\text{Convenience Yield Factor:}\quad
+c_t &= \text{PC}_1\bigl(\tilde S_{1,t},\tilde S_{2,t},\tilde S_{3,t},\tilde S_{4,t}\bigr)
+\end{aligned}
+\]
+*Proxy for relative richness/cheapness of Treasuries* :contentReference[oaicite:3]{index=3}
+
+\vspace{1em}
+
+\textbf{2. Term-Premium Attribution Model}  
+\vspace{0.3em}
+\[
+\boxed{
+\mathrm{TP}_t 
+= \alpha \;+\;\beta_c\,c_t 
+\;+\;\beta_d\,d_t^{\perp} 
+\;+\;\beta_u\,u_t 
+\;+\;\beta_i\,i_t 
+\;+\;\beta_g\,g_t 
+\;+\;\beta_r\,r_t 
+\;+\;\varepsilon_t
+}
+\]
+\[
+\begin{aligned}
+c_t &= \text{Treasury Convenience Yield Factor}_t \\
+d_t &= \text{Fiscal Expansion Factor Factor}_t \\
+d_t^{\perp} &= d_t \;-\;\gamma\,c_t
+  &&\text{(Public Debt/GDP orthogonalized to }c_t\!)}\\
+u_t &= \text{Unemployment Gap}_t
+  \quad\bigl(\text{labor-market risk}\bigr)\\
+i_t &= \text{Consensus Dispersion in Forecast for Inflation}_t \\
+g_t &= \text{Consensus Dispersion in Forecast for Growth}_t \\
+r_t &= \text{Consensus Dispersion in Forecast for Forward Short Rate}_t \\
+  \quad\bigl(\text{growth, inflation, 1y3m}\bigr)
+\end{aligned}
+\]
+*Explains model-implied 2s10s term premium on supply, fiscal & uncertainty drivers* :contentReference[oaicite:4]{index=4}
+
+\end{frame}
+
+\end{document}
