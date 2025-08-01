@@ -1,0 +1,86 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usecolortheme{dolphin}
+\definecolor{fidelitygreen}{RGB}{0,104,71}
+\setbeamercolor{structure}{fg=fidelitygreen}
+\setbeamerfont{title}{size=\Large,series=\bfseries}
+\setbeamertemplate{navigation symbols}{}
+
+\begin{document}
+
+% Slide 1: VAR Specification
+\begin{frame}{\Large Shock‐Propagation Framework: VAR Specification}
+  \centering
+  \vspace{-1em}
+  \[
+    \mathbf{Y}_t \;=\; \mathbf{c}
+      \;+\;\sum_{i=1}^{4}\Phi_i\,\mathbf{Y}_{t-i}
+      \;+\;\boldsymbol\varepsilon_t,
+    \quad
+    \boldsymbol\varepsilon_t\sim\mathcal{N}(\mathbf{0},\,\Sigma)
+  \]
+  \vspace{0.5em}
+  \begin{itemize}
+    \item<1-> \textbf{Endogenous vector:}
+      \(\displaystyle \mathbf{Y}_t = 
+         \begin{bmatrix}
+           \Delta\mathrm{TP}_{2\!-\!10,t}\\
+           \Delta\mathrm{SupplyFactor}_t\\
+           \Delta\mathrm{Debt/GDP}_t
+         \end{bmatrix}\)
+
+    \item<2-> \textbf{Lag order:} \(p=4\) (weekly data \(\approx\) 1 month memory)
+
+    \item<3-> \textbf{Identification:}
+      Cholesky order
+      \(\{\mathrm{Supply}\;\rightarrow\;\mathrm{Debt/GDP}\;\rightarrow\;\mathrm{TermPremium}\}\)
+
+    \item<4-> \textbf{Normalization:}
+      scale each structural shock to \(+1\sigma\)
+
+    \item<5-> \textbf{Objective:}
+      Quantify \alert{magnitude}, \alert{speed}, and \alert{persistence}
+      of shock‐driven \emph{steepening} vs. \emph{flattening}.
+  \end{itemize}
+\end{frame}
+
+% Slide 2: IRF Definition & Extraction
+\begin{frame}{\Large Impulse Response Functions: Definition \& Extraction}
+  \centering
+  \vspace{-0.5em}
+  \[
+    \text{IRF}_{h}^{(j)}
+    = \frac{\partial \mathbf{Y}_{t+h}}{\partial \varepsilon_{j,t}}
+    = \Psi_h \, e_j,
+    \quad
+    \Psi_h = \sum_{k=1}^{4}\Phi_k\,\Psi_{h-k},
+    \;\Psi_0 = I
+  \]
+  \vspace{0.5em}
+  \begin{itemize}
+    \item<1-> \textbf{Horizons:} \(h = 0,1,\dots,52\) weeks  
+    \item<2-> \textbf{Unit shocks:} Normalize \(\varepsilon_{j,t}\) to \(+1\sigma\)  
+    \item<3-> \textbf{Extract metrics:}
+      \begin{itemize}
+        \item \alert{Peak magnitude} (basis points)  
+        \item \alert{Time‐to‐peak} (weeks)  
+        \item \alert{3-month cumulative impact} (bp)
+      \end{itemize}
+    \item<4-> \textbf{Pipeline:}
+      \[
+        \text{Data} \to \Delta\text-series \to \text{Estimate VAR(4)} 
+        \to \text{Compute IRFs} \to \text{Summarize metrics}
+      \]
+    \item<5-> \textbf{Why It Works:}
+      VAR+IRF yields a \emph{transparent}, \emph{reproducible} mapping
+      from economic shocks → term‐premium dynamics.
+    \item<6-> \textbf{Enhancements:}
+      \begin{itemize}
+        \item Sign‐restriction identification  
+        \item Nonlinear / regime‐switching VAR  
+        \item Time‐varying volatility (GARCH‐VAR)
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\end{document}
