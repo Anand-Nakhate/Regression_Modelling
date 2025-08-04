@@ -475,3 +475,62 @@ plt.colorbar(heat, ax=ax, fraction=0.046, pad=0.04)
 
 plt.tight_layout()
 plt.show()
+
+
+from scipy import stats
+from statsmodels.stats.proportion import proportion_confint
+
+class DecileForwardAnalysis(DecileForwardAnalysis):
+    def aggregate_with_tests(self, horizons: List[int], alpha: float = 0.05) -> pd.DataFrame:
+        """
+        Build on aggregate_metrics by adding:
+          - mean_tstat, mean_pval, mean_ci_lower, mean_ci_upper
+          - hit_n, hit_rate, hit_pval, hit_ci_lower, hit_ci_upper
+        """
+        records = []
+        for h in horizons:
+            fwd_col = f"fwd_{h}d"
+            dfh = self.df.dropna(subset=['decile', fwd_col])
+            for dec, grp in dfh.groupby('decile'):
+                vals = grp[fwd_col].values
+                n = len(vals)
+                mean = vals.mean()
+                std = vals.std(ddof=1)
+                sem = std / np.sqrt(n)
+
+                # 1. One-sample t-test for mean != 0
+                t_stat, pval_mean = stats.ttest_1samp(vals, popmean=0)
+                ci_low, ci_high = stats.t.interval(
+                    1 - alpha, df=n-1, loc=mean, scale=sem
+                )
+
+                # 2. Binomial test for hit-rate != 0.5
+                hits = np.sum(vals > 0)
+                hit_rate = hits / n
+                pval_hit = stats.binom_test(hits, n, p=0.5, alternative='two-sided')
+                # Wilson interval
+                ci_hit_low, ci_hit_high = proportion_confint(
+                    count=hits, nobs=n, alpha=alpha, method='wilson'
+                )
+
+                records.append({
+                    'decile': dec,
+                    'horizon': h,
+                    'n_obs': n,
+                    'mean': mean,
+                    'std': std,
+                    'mean_tstat': t_stat,
+                    'mean_pval': pval_mean,
+                    'mean_ci_lower': ci_low,
+                    'mean_ci_upper': ci_high,
+                    'hit_n': hits,
+                    'hit_rate': hit_rate,
+                    'hit_pval': pval_hit,
+                    'hit_ci_lower': ci_hit_low,
+                    'hit_ci_upper': ci_hit_high,
+                })
+
+        out = pd.DataFrame.from_records(records)
+        return out.set_index(['decile', 'horizon']).sort_index()
+
+
