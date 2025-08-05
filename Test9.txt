@@ -1,0 +1,467 @@
+Term Premium Reset Attribution and Outlook – Presentation Script
+Slide 1: Title – Term Premium Reset: Attribution and Outlook
+(August 2025 – Presenter: Anand Nakhate, SAI Quantitative Research Intern) Welcome everyone. Today I’ll be presenting our original research on the “Term Premium Reset: Attribution and Outlook.” In this talk, we’ll explore why the term premium has shifted upward in recent times and what that means going forward. This research extends Goldman Sachs’ framework by using market-observable yield curve spreads – specifically 2s10s, 5s10s, and 10s30s – to gauge the richness or cheapness of different Treasury curve segments in real time. The goal is to identify the drivers of the term premium’s reset and provide a practical outlook for portfolio strategy. I’ll start with the macro motivation for this work and then dive into our modeling approach. We’ll examine how we attribute term premium changes to various factors (like supply-demand imbalances and fiscal policy) and how those relationships have evolved across different regimes. We’ll also discuss impulse response analyses to understand the effect of shocks (for example, a sudden change in safe-haven demand or a fiscal surprise) on the yield curve. Finally, we’ll highlight how these insights can be applied – for instance, in timing curve trades or adjusting asset allocation – and conclude with the strategic implications and next steps. (Transition: Before we jump into the details, let’s outline the journey – from the big-picture context to the technical findings – so you know what to expect.)
+Slide 2: Table of Contents – Overview of Topics
+Executive Summary: A high-level recap of the term premium’s recent behavior and key findings of our study.
+Term Premium & Its Drivers: Defining term premium and hypothesizing what macro forces drive it (supply-demand, fiscal policy, and other macro factors).
+Attribution & Impact Modeling: Our regression framework that attributes movements in term premium to those drivers, including the structure of the model and how factor influences have changed over time.
+Predictive Modeling: Extending the analysis to forecasting – using factor signals in portfolio strategy. This includes shock-response analysis via VAR (impulse response functions) and simple predictive models (like factor-augmented autoregressions and a quintile signal analysis for trading).
+Conclusion & Next Steps: Summarizing the new regime’s implications and outlining future avenues to refine this research further. Throughout the presentation, I’ll maintain a top-down narrative: beginning with the broad motivation and context, then drilling down into model specifics and empirical insights, and finally circling back to what it means for portfolio managers and asset allocators in practical terms. Each section naturally builds on the previous one. (Transition: Let’s begin with the motivation – why is the term premium suddenly in focus, and what prompted this research now?)
+Slide 3: MOTIVATION – Why Investigate the Term Premium Reset?
+Key Question: “How have shifts in supply, fiscal policy, and macro uncertainty driven the recent term premium reset?” Over the past year, we’ve witnessed a notable steepening in the yield curve – a “term premium reset” where long-term yields rose significantly relative to short rates. This matters because the term premium (the extra yield investors demand for holding long-term bonds instead of a series of short-term bonds) is a fundamental return driver for bond portfolios and influences curve dynamics. In other words, when term premium changes, it affects bond valuations, hedging costs, and the relative attractiveness of long vs short duration. For portfolio managers, understanding term premium is crucial to positioning along the curve. Our motivation is twofold:
+First, to identify the forces moving the term premium and trace how their influence has evolved over time. There’s been much debate about what’s behind the surge in long-term yields – is it massive Treasury supply? Changing investor demand for safe assets? Or perhaps fiscal policy and macro volatility? We hypothesize multiple drivers and want to disentangle their roles.
+Second, to use this understanding to navigate the current regime. If certain factors (say, fiscal deficits) are driving term premium now more than in the past, that has strategy implications: it might signal a regime shift requiring a different approach to duration and curve trades.
+Hypothesized Drivers of the “Reset”:
+Supply/Demand Imbalance: The idea that rapidly increasing Treasury issuance (supply) and/or changes in investor demand erode the “safe asset premium.” If investors are less willing to hold the flood of Treasuries, they demand a higher term premium (long yields rise).
+Expansionary Fiscal Policy: Large government deficits and spending can boost growth and inflation expectations, adding uncertainty to the outlook. This fiscal-driven macro uncertainty may require higher compensation (higher term premium) for long-term bonds.
+(Core Finding Preview:) Our research suggests that in this post-pandemic environment, expansionary fiscal policy appears to be a larger contributor to the term premium’s rise than previously recognized. This doesn’t mean supply and demand dynamics are unimportant – just that the data show fiscal effects have become more prominent. This aligns with some recent analyses (for example, Goldman’s early 2025 report on Treasury supply) hinting that deficits and the removal of Fed support (QT) might be fundamentally repricing the long end. We’ll see evidence of this in our attribution results. (Transition: Before attributing anything, we need to clearly define what the term premium is and how we measure it in a transparent, real-time way.)
+Slide 4: Definition – What is the Term Premium?
+At its core, Term Premium is “the extra yield investors demand for holding a long-term bond instead of rolling over short-term debt.” In other words, it’s the compensation for duration risk and uncertainty about future interest rates. We know that a Treasury yield can be thought of as comprising two components:
+Expected path of short-term rates over the bond’s life (essentially what the market thinks the Fed will do), and
+Term Premium – the remainder, which is the extra yield to compensate for risks (rate volatility, inflation uncertainty, liquidity, etc.).
+Mathematically, if $y_{t}^{(10yr)}$ is the 10-year yield, and $E_t[\text{short rates}]$ is the expected average short rate over 10 years, then Term Premium ≈ $y_{10yr} - E_t[\text{short rates}]$. (This formula on the slide illustrates that concept.) Essentially, if investors are demanding yield above the expected short-rate path, that excess is the term premium. Important: The true term premium is not directly observable day-to-day – it’s typically estimated by complex models (like the Fed’s ACM model by Adrian, Crump, & Moench, or other term structure models). However, such estimates are latent and can be opaque or slow to update. For this study, we wanted a real-time proxy that’s easily observable. 🔍 Our Proxy: We use the 2s10s yield spread as a transparent, market-based proxy for the term premium. The 2s10s spread (10-year yield minus 2-year yield) captures the slope of the yield curve from short to intermediate maturities, which historically correlates with term premium movements. Why 2s10s? The 2-year yield reflects near-term Fed expectations, and the difference up to the 10-year yield reflects additional yield that likely includes term premium. While not a perfect measure, 2s10s is tradeable and observable in real-time, making it very practical for decision-making. (Visual Cue: On the slide, you see an illustration of the yield components – the recent curve steepening labeled as the “reset.” It highlights that a spike in long yields beyond what short-rate expectations would suggest is exactly the term premium increase we’re concerned with.)* Note: There are known model estimates of term premium (like the ACM model), but these tend to lag or be revised. By contrast, 2s10s gives us an immediate read on whether long-term yields are high relative to the short-end. For our purposes, we assume 2s10s spread movements largely represent changes in term premium. We will validate this choice by comparing it with other segments of the curve later (and indeed, similar patterns emerge in 5s10s, 10s30s spreads). (Transition: Having defined term premium and chosen a proxy, the next logical step is to ask: what drives term premium movements? The following slide lays out our hypothesized drivers.)
+Slide 5: Key Drivers – What Drives the Term Premium?
+We decompose term premium changes into three categories of drivers, each corresponding to specific measurable factors:
+1. Supply and Demand Imbalance: Factors capturing the “safe asset premium” or scarcity value of Treasuries. Two proxies here:
+Treasury Convenience Yield – This measures how much extra value (yield sacrifice) investors are willing to accept for holding Treasuries relative to other near-risk-free assets. Essentially, it’s a “safety premium.”
+Public Debt-to-GDP (Free Float Debt/GDP) – This represents the supply side: the volume of public debt relative to the economy. Higher debt/GDP (especially free-floating supply not held by the Fed) could put upward pressure on yields (increasing term premium) if investors require more yield to absorb the supply.
+2. Fiscal Policy Stance (Fiscal Expansion): This captures how expansionary or restrictive fiscal conditions are. We needed a way to quantify fiscal impetus on the yield curve. A key proxy we use is the “Fiscal Expansion Factor,” which we’ll detail soon. Intuitively, it reflects government deficit spending and its macro impact. For example, a larger deficit (financed by issuing Treasuries) can raise growth/inflation expectations and term premium. This category may include measures like the cyclically-adjusted budget balance or surprises in fiscal announcements. In our model, we derive a factor that isolates fiscal effects not already captured by the safe-asset premium. (We’ll see how in a moment.)
+3. Broader Macro Factors: Capturing economic fundamentals and uncertainties:
+Inflation & Growth Uncertainty: We use consensus forecast dispersion (think of economists’ disagreement in surveys) for inflation and growth as measures of uncertainty. When there’s more uncertainty about future inflation or growth, investors demand a higher term premium as insurance.
+Forward Rate Uncertainty: Similarly, we include dispersion in forecasts for future short-term interest rates (forward Fed rate expectations). This proxies interest rate volatility expectations – higher uncertainty about future Fed policy can steepen the curve (investors want compensation for the risk of rates going higher than expected).
+Economic Slack (Unemployment Gap): The unemployment gap (the difference between the current unemployment rate and its natural rate) is a classic macro factor – it captures where the economy is relative to potential. A tight economy (negative gap) might raise inflation fears (and term premium), whereas slack (positive gap) might lower term premium.
+In summary, our model includes 6~7 factors spanning these categories:
+Treasury Convenience Yield (safe asset demand/supply proxy)
+Free-Float Debt-to-GDP (or its residual) – supply/fiscal proxy
+Fiscal Expansion Factor (captures deficits/fiscal policy impact distinctly)
+Inflation uncertainty (forecast dispersion)
+Growth uncertainty (forecast dispersion)
+Forward rate uncertainty (forward Fed rate dispersion)
+Unemployment Gap
+(The slide illustrates these in a schematic way – grouping factors under Supply/Demand, Fiscal, and Macro headings – showing how each category influences term premium.) A quick note: We found it useful to separate “Treasury convenience yield” from pure debt supply, even though they’re related. This is because convenience yield is more about demand for safe assets (and how much yield investors forgo to hold Treasuries), whereas debt/GDP or fiscal deficits are about supply. They can move together (e.g., heavy supply may reduce the safety premium), but by including both, we can see which channel is at play. (Transition: Now, let’s dive deeper into the first driver – the Treasury convenience yield factor. We’ll see how we construct it and why it’s a good measure of safe-haven demand.)
+Slide 6: Treasury Convenience Yield Factor – Constructing the “Safe Asset” Premium
+One original contribution of our research is quantifying the Treasury “convenience yield” – essentially the safety premium – using observable market spreads. Instead of guessing the safe asset demand, we constructed a factor from market data:
+We gathered a range of spreads that reflect the extra value or premium investors place on Treasuries relative to other instruments:
+Credit spreads (AAA corporates) – Treasuries vs high-grade corporate yields (if corporates widen, Treasuries are more “precious” by comparison).
+Currency-hedged foreign government yield spreads – For example, the yield difference between US Treasuries and an equivalent maturity German Bund or Japanese JGB after hedging FX risk (via swap markets). If foreign yields are much lower than Treasuries after hedging, it suggests global demand for USD safe assets (investors accept lower returns abroad, meaning Treasuries might be “cheap” or vice versa).
+Swap spreads to OIS – The 10-year swap rate minus the 10-year overnight-index-swap (OIS) rate. A positive swap spread can indicate scarcity of Treasuries (since investors pay a premium to receive fixed in swap vs holding a Treasury). We also look at the 2s30s swap spread curve (the slope of swap spreads) to capture any term-structure nuance in that scarcity premium.
+We performed a Principal Component Analysis (PCA) on a basket of such spreads. The first principal component (PC1) of these various spreads explains about ~50% of the total variance, meaning there’s a dominant common factor across these “safe asset premium” measures. We interpret that PC1 as the Treasury Convenience Yield Factor. Interpretation:
+When this factor is high, it means Treasuries are rich – investors are willing to forego a lot of yield to hold Treasuries relative to alternatives (e.g., very low yields on swaps or foreign bonds compared to UST). High convenience yield = strong demand for Treasuries (scarcity value).
+When the factor is low, Treasuries are cheap – suggesting an oversupply or weakened special demand (investors are demanding extra yield to hold Treasuries versus other assets).
+On the slide’s chart, you can see how this factor has evolved (likely declining recently). Indeed, recently the Treasury convenience yield has been falling – indicating the market is less willing to pay up for Treasuries. This drop aligns with the narrative of ample supply or reduced safe-haven demand, contributing to higher term premiums. Key point: This Supply-Demand signal is crucial. By distilling various spreads into one index, we have a real-time gauge of “rich vs cheap” for Treasuries. Notably, as of now, the factor’s low level implies Treasuries are relatively cheap (no huge safety premium) – which intuitively should correspond to a higher term premium required by investors. We will see that relationship quantified soon. (Transition: The next slide (Slide 7) provides the technical details – the model equation for the convenience yield factor and how each spread enters the PCA. I’ll briefly touch on it to reinforce our factor construction.)
+Slide 7: Building the Convenience Yield Factor – Model Equations
+For the quantitatively inclined, this slide shows the formulae behind our Convenience Yield factor (CY):
+We denote the input spreads:
+$S_{1}$ = AAA Corporate bond spread (over Treasuries)
+$S_{2}$ = Average FX-hedged foreign sovereign yield spread (how much higher yield USTs offer over hedged foreign gov bonds, capturing global safe asset demand).
+$S_{3}$ = 10-year swap spread (10yr swap rate – 10yr OIS).
+$S_{4}$ = 2s30s swap spread curve (30yr swap spread – 2yr swap spread, a proxy for term-specific scarcity).
+We standardize each $S_{i}$ and feed them into a PCA:
+The Convenience Yield Factor = PC1 = the first principal component of {S1, S2, S3, S4}.
+Mathematically: $\text{CY Factor}t = w_1 S{1,t} + w_2 S_{2,t} + w_3 S_{3,t} + w_4 S_{4,t}$, where the weights $(w_i)$ come from the PCA eigenvector. We don’t need to go into those weight specifics during the talk, just understand it’s an optimized linear blend capturing the common movement. The result is a single time series that captures the “safe asset premium.” On the slide, the equations and definitions clarify how each component is calculated (e.g., S2 uses covered interest parity to compute the foreign yield spread on a consistent basis). The key takeaway from this construction is that our Convenience Yield factor is grounded in market prices (credit spreads, cross-currency basis, etc.), making it adaptive and objective. It’s not an arbitrary index – it’s derived from how investors are pricing related assets. (Transition: Now that we have this factor, a natural question is: how does it relate to the term premium itself? Slide 8 explores the relationship between the convenience yield factor and the 2s10s term premium proxy, including how this relationship has differed across time periods.)
+Slide 8: Convenience Yield vs Term Premium – Rich/Cheap and Regime Shifts
+This slide examines the historical relationship between our Treasury convenience yield factor and the term premium (2s10s spread). There’s a chart (scatter or time-series) showing how term premium levels correspond to different levels of the convenience yield factor, possibly split by eras. Key insights to highlight:
+Rich vs Cheap Regimes: As expected, when Treasuries are rich (high convenience yield factor indicating strong demand), the term premium tends to be lower (investors accept lower yields). Conversely, when Treasuries are cheap (low factor), the term premium is higher. The slide explicitly notes: “High factor = Rich (treasuries in demand, yields suppressed); Low factor = Cheap (treasury oversupply, yields elevated).” So there is an inverse relationship: rich Treasuries go with a flatter curve (low 2s10s), cheap Treasuries with a steeper curve.
+Current Status: The current value of the convenience yield factor is quite low, implying Treasuries are cheap relative to other assets. According to the chart, this correlates with the term premium being relatively high. In other words, by this measure, today’s term premium is elevated partly because Treasuries have lost some of their “scarcity value.” For a PM, this suggests the market may have overshot – Treasuries being very cheap could correct if conditions normalize (we’ll touch on this as a predictive insight later).
+Era-Dependent Slopes: Interestingly, the relationship between the factor and term premium is not static over history. The bullet on the slide mentions each macro-regime exhibits its own slope. For example, in some decades, a given drop in the convenience yield factor corresponded to a larger rise in term premium than in other decades. This tells us the sensitivity of term premium to safe-haven demand has changed – possibly due to structural differences (think: pre-2008 vs post-GFC with QE, or pre vs post-COVID).
+This underscores a need for dynamic calibration. Rather than assume one fixed coefficient, our approach uses rolling regressions to allow these relationships to evolve (we’ll see that in the attribution model). Practical implication: When using a factor like this for trading or risk management, one should be aware of regime changes. For instance, in a crisis regime, small changes in safe asset demand might hugely move term premium, whereas in a stable regime, that link might be weaker. We will account for this by allowing time-varying parameters. (Transition: We’ve now introduced the context, defined term premium, and described key drivers (especially the safe asset factor). With that foundation, let’s move into the core of the analysis: the attribution model that quantifies how much each factor explains the term premium, and how those contributions have changed through time.)
+Slide 9: Attribution Model – Introduction
+(This slide likely serves as a section divider titled “Attribution Model.”) Now we transition from concepts to the modeling framework. The goal of the attribution model is straightforward: Explain the movements in the term premium (2s10s spread) using our set of macro factors. I’ll start by outlining the model specification and then discuss the results and insights we get from it. (Transition: Slide 10 will show the regression equation and list the factors formally. Let’s walk through that equation.)
+Slide 10: Attribution Model Specification – Regression Equation
+On this slide, we have the regression equation used for term premium attribution: 
+TermPremium
+𝑡
+  
+=
+  
+𝛼
+  
++
+  
+𝛽
+CY
+⋅
+(
+Convenience Yield Factor
+)
+𝑡
+  
++
+  
+𝛽
+Fiscal
+⋅
+(
+Fiscal Expansion Factor
+)
+𝑡
+  
++
+  
+𝛽
+DebtRes
+⋅
+(
+Debt/GDP Residual
+)
+𝑡
+  
++
+  
+𝛽
+𝑈
+⋅
+(
+Unemp. Gap
+)
+𝑡
+  
++
+  
+𝛽
+𝜋
+⋅
+(
+Inflation Uncert.
+)
+𝑡
+  
++
+  
+𝛽
+𝑔
+⋅
+(
+Growth Uncert.
+)
+𝑡
+  
++
+  
+𝛽
+𝑟
+⋅
+(
+Rate Uncert.
+)
+𝑡
+  
++
+  
+𝜖
+𝑡
+.
+TermPremium 
+t
+​
+ =α+β 
+CY
+​
+ ⋅(Convenience Yield Factor) 
+t
+​
+ +β 
+Fiscal
+​
+ ⋅(Fiscal Expansion Factor) 
+t
+​
+ +β 
+DebtRes
+​
+ ⋅(Debt/GDP Residual) 
+t
+​
+ +β 
+U
+​
+ ⋅(Unemp. Gap) 
+t
+​
+ +β 
+π
+​
+ ⋅(Inflation Uncert.) 
+t
+​
+ +β 
+g
+​
+ ⋅(Growth Uncert.) 
+t
+​
+ +β 
+r
+​
+ ⋅(Rate Uncert.) 
+t
+​
+ +ϵ 
+t
+​
+ . Let’s decode this:
+$\alpha$ is an intercept (baseline term premium not explained by factors). Think of it as the “residual” term premium that could reflect persistent structural factors or missing variables (e.g. global savings glut, regulatory climate).
+The $\beta$ terms are coefficients for each factor:
+$\beta_{\text{CY}}$ for the Treasury Convenience Yield Factor (safe asset demand/supply).
+$\beta_{\text{Fiscal}}$ for the Fiscal Expansion Factor – this factor represents fiscal policy’s direct effect. (We constructed this by taking the part of “free float” debt-to-GDP that isn’t explained by the convenience yield factor, effectively isolating fiscal supply effects from pure safe-haven demand. In other words, this might capture shocks like sudden deficit increases beyond what investors’ demand absorbs.)
+$\beta_{\text{DebtRes}}$ for Debt/GDP residual – as mentioned, we include a residual of “free-floating debt to GDP regressed on the convenience yield factor.” This technical step ensures that we capture any supply effect not already captured by the convenience yield. It prevents double-counting supply in the fiscal factor. (This could be considered part of the fiscal/supply category).
+$\beta_{U}$ for Unemployment Gap (economic slack).
+$\beta_{\pi}$ for Inflation Uncertainty (we measure this as dispersion in long-term inflation forecasts).
+$\beta_{g}$ for Growth Uncertainty (dispersion in GDP forecasts).
+$\beta_{r}$ for Forward Rate Uncertainty (dispersion in interest rate forecasts, or equivalently, uncertainty about Fed policy down the line).
+All variables are weekly frequency in our dataset, and we run a rolling regression to allow coefficients to evolve (we used a 2-year rolling window in one variant). The slide notes we tried both with intercept and without intercept to test the robustness:
+With intercept: Lets the baseline shift per regime.
+Without intercept: Forces the factors to explain the level, which can highlight if an unexplained baseline exists.
+This model structure basically unifies all our hypothesized drivers into one linear framework. By examining the estimated $\beta$s over time, we can see which factors are significant drivers and how their impact changes in different periods. (Transition: Now that the model is defined, the next slide (11) shows how well it fits the actual term premium and gives a sense of each factor’s contribution.)
+Slide 11: Model Fit – Actual vs Fitted Term Premium & Factors Summary
+On this slide, the first thing to note is the fit of the model. We plot the actual 2s10s term premium (the black line) versus the model’s fitted values (the orange line, for example). The model is rolling and updates its coefficients, so we see the fit adjusting through time. Observation: The model tracks the actual term premium quite well, capturing most of the swings. The average R-squared is quite high – about 90%+ over the rolling windows. In other words, our chosen factors collectively explain the bulk of the variance in term premium movements in recent years. This gives us confidence that these drivers are indeed relevant. We also list the factors and their most recent coefficients (with t-statistics). Here’s a summary of what the latest regression (using data up to now) tells us:
+Convenience Yield Factor: Has a significant coefficient (likely positive sign: when convenience yield factor rises – Treasuries richer – term premium falls, and vice versa). It tends to be a strong driver especially during big market dislocations (we’ll detail the time evolution soon).
+Fiscal Expansion Factor: Also shows up significant in the latest window, indicating a meaningful impact on term premium. We find that this factor’s role has increased in the current regime (more on that shortly).
+Unemployment Gap: This macro fundamental has some explanatory power (e.g., tighter labor market often goes with higher term premium through inflation fears). Its influence can vary across cycles.
+Inflation Uncertainty & Growth Uncertainty: These “uncertainty” factors contribute as well – especially noticeable during periods of high economic uncertainty (e.g., around COVID shock, inflation surges). If forecast dispersion is high, typically term premium is elevated (investors demand a cushion for unpredictability).
+Short-Rate Uncertainty: Similar logic – uncertainty about Fed’s future path tends to steepen the curve (positive coefficient). For example, when policy outlook is very unclear (think 2022 when Fed’s trajectory was in flux), term premium can widen to compensate.
+The table on the slide (Model Parameters with Coefficient and t-value) indicates which factors are statistically significant in the most recent rolling regression. From it, we see both the convenience yield and fiscal factors have high t-values, as does inflation uncertainty perhaps. This confirms supply/fiscal drivers and macro uncertainty are key contributors to the term premium reset. Additionally, the Model Metrics show we used a 2-year rolling window on weekly data. The high R² (~93%) I mentioned reflects that within each 2-year window the model captured most of the term premium moves. The rolling approach means coefficients can change to reflect different eras (we’ll examine those changes next). (Transition: With the model fit established, slide 12 will decompose the term premium into contributions, including the intercept or “baseline premium” in each period. This will tell us whether there was an unexplained component – and importantly, whether that baseline premium is still present today.)
+Slide 12: Attribution with Intercept – Baseline Term Premium Over Time
+This slide presents the term premium attribution over time when we allow an intercept in the regression. Essentially, it’s showing how each factor (plus the intercept) contributes to the level of the 2s10s term premium in different periods (you might see colored areas or lines for each component). Key insight #1: Presence of a “Baseline” Premium in Past Regimes:
+We find that an intercept (constant term) was significant in certain past regimes. For example, in the post-Taper Tantrum period (mid-2010s) and again during the post-COVID QE era, there was a persistent baseline in term premium that our factors alone couldn’t explain. This intercept could be interpreted as a structural or omitted component – perhaps reflecting global factors like excess savings or regulatory demand (banks’ liquidity requirements), etc., that kept term premiums low beyond what our macro factors predicted. The slide notes: “a significant intercept accounts for part of term premium in each regime, suggesting omitted drivers (global flows, bank regs) and serial correlation.” In other words, historically there were times when something like “global QE” or “regulatory bid” provided an extra dampening of term premium that isn’t fully captured by our explicit factors. This manifested as a non-zero intercept. Key insight #2: That Baseline Premium is not significant today:
+Crucially, as of the current regime (the post-2022 period of Fed tightening, fiscal expansion, and QT), the intercept term has effectively vanished – it’s no longer statistically significant. The model with intercept now finds the constant near zero. This means the factors we have (supply, fiscal, uncertainty, etc.) fully explain the term premium level today. There isn’t an extra “mystery” premium unaccounted for at the moment. This is an important result: it suggests that the term premium is currently grounded in fundamentals (supply, fiscal, macro factors) rather than an unobservable residual force. In practical terms, it means we can trust our factor-driven analysis for the current environment, and there isn’t an obvious hidden factor like there might have been when central banks were heavily suppressing long yields. (Visual: The chart on slide 12 likely shows stacked contributions of each factor plus a band for the intercept. You can see the intercept was a sizable portion at times (colored segment), but by the end (today) that segment shrinks to near zero, with nearly all of the term premium coming from identified factors.) For portfolio managers, the disappearance of the intercept implies that market-observable forces are telling the whole story right now. There’s no extra policy distortion unaccounted – which aligns with the idea that we’ve exited the regime of extreme central bank intervention and entered a more “fundamental” regime.) (Transition: Now that we’ve established what portion of term premium each factor accounts for (and that no extra baseline remains), the next question is how each factor’s impact has changed over time. Slide 13 will summarize the evolution of factor loadings (coefficients) across different regimes in the intercept-inclusive model.)
+Slide 13: Evolution of Factor Loadings (with Intercept)
+This slide highlights how the significance and magnitude of key factor coefficients have evolved across different periods:
+Constant (Intercept): As we discussed, the intercept was highly significant in the post-Taper tantrum era (mid-2010s) and again in the post-COVID period when QE and global savings were abundant. A significant positive intercept then implied a persistent downward bias on term premium (or unexplained component). This suggests some auto-regressive inertia or missing drivers that kept term premium low (e.g., global central bank purchases, regulations like LCR causing banks to hoard Treasuries, etc.). Now, in the latest regime, this intercept effect is gone – indicating a break from the prior low-term-premium equilibrium.
+Convenience Yield Factor: Its influence has been strong and reliably significant during major regime shifts, but less so in stable periods. For instance:
+During episodes like the 2013–14 Taper Tantrum or the 2020 COVID shock, the convenience yield factor’s coefficient spiked – meaning changes in safe-haven demand had a big impact on term premium. (E.g., when the Fed signaled tapering bond purchases in 2013, the sudden drop in “safety premium” sent term premium soaring – our model would reflect a strong coefficient then).
+In contrast, in mid-cycle periods where the convenience yield was relatively stable (no big swings in spread demand), its coefficient appears weaker or even insignificant. In the late 2010s (pre-COVID) when markets were calm, the term premium wasn’t moving much based on safe-asset demand changes because those changes were minor.
+Today: The convenience yield factor is still a driver, but it’s somewhat “secondary” relative to fiscal. It’s not as dominant as at its peak influence (e.g., it’s important, but the magnitude of its coefficient is lower now than in a crisis regime).
+Fiscal Expansion Factor: This is one of the most intriguing findings. The fiscal factor’s coefficient has shown sustained significance in the most recent regime. In earlier periods (say pre-2020), fiscal policy surprises often weren’t a major market driver – deficits were rising but at predictable paces, and monetary policy was offsetting a lot of it. Our model in those times likely saw the fiscal factor as “noise” (insignificant coefficients). However, in the current environment of large deficits and the Fed not actively buying Treasuries (QT), the fiscal factor has emerged as a first-order driver of term premium. Its coefficient has flipped from negligible to highly significant and sizable, suggesting a possible structural shift. The market is now pricing in fiscal expansion in a way it didn’t before. Essentially, supply from deficits and the associated macro impact (higher growth/inflation risk) are demanding a higher term premium – and our model quantifies that clearly.
+(Although not explicitly listed in the snippet, we should note):
+The uncertainty factors (inflation and growth dispersion) likely had notable effects particularly in periods like the late 1970s–80s (if our data goes back that far) or the 2021–22 inflation surge. High inflation uncertainty would heighten term premium. Conversely, in times of anchored inflation expectations (e.g., mid-2010s), that coefficient might dip. We can mention that in passing if relevant.
+The unemployment gap tends to matter countercyclically: in hot economies (low unemployment relative to natural rate, like late 1960s or 2018-2019) term premium tends to climb (inflation risk premium), whereas in recessions (high unemployment) term premium often falls as future rates are expected to drop and deflation risks appear. Our rolling coefficients likely reflect that – significant around turning points.
+Big picture: These evolving loadings underscore that term premium drivers are regime-dependent. For PMs, this is a caution that what drove term premium last decade is not necessarily what drives it now. We appear to be in a new regime where fiscal policy and macro uncertainties (inflation persistence, etc.) are paramount, whereas in the prior decade global demand factors dominated. Recognizing this shift can inform strategy (e.g., pay more attention to Treasury issuance schedules and fiscal news now than one might have in, say, 2015). (Transition: We’ve seen results including an intercept. Next, to stress-test our understanding, we examine the model without an intercept. Slide 14 will show how the model fits when we force all term premium movement to be explained by our factors alone, and we’ll see the latest coefficients under that specification.)
+Slide 14: Model Fit (No Intercept) – Rolling 2-Year Regression
+Here we present the attribution model results without an intercept, using a 2-year rolling window. This forces the sum of factor contributions to explain the entire term premium at each point. Actual vs Fitted (no-intercept): The chart shows that even without a constant term, the model still tracks the actual 2s10s term premium quite closely through time. There are small deviations at certain points (notably at extreme regime shifts – more on that in a moment), but overall the model does a good job. This indicates our chosen factors are comprehensive enough to explain the level shifts when given flexibility to update coefficients frequently. Notably, the most recent fit (trailing two years) is very tight – because, as we noted, the intercept was essentially zero lately, so the no-intercept model is nearly the same as the intercept model for the current period. On the slide we have a table of Model Parameters (Most Recent Roll) – basically the current coefficients and t-stats for each factor under the no-intercept regression:
+Convenience Yield: Coefficient remains significant and of expected sign (a cheapening of Treasuries leads to a steeper curve).
+Fiscal Expansion: Highly significant in the current roll – confirming its strong influence.
+Unemployment Gap: Perhaps moderately significant – indicating some cyclical effect remains.
+Inflation Uncertainty, Growth Uncertainty, Short-Rate Uncertainty: These likely show up as well; typically at least one or two of these uncertainty measures is significant at any given time. They might move somewhat together (e.g., periods of high inflation uncertainty are often also high interest-rate uncertainty periods).
+The Model Metrics confirm the specs: Rolling window = 2 years, data frequency weekly. One standout metric: the Average R-squared is about 93%, which is impressively high. This implies that in each 2-year window, on average 93% of the variation in 2s10s is captured by our factors. It shows the model isn’t just a one-off fit; it consistently explains term premium movements over different sub-periods with high fidelity. To interpret for a PM: a 93% R² means our model has very little “noise” – term premium moves are largely systematic and linked to observable macro factors rather than random shocks. That’s encouraging if one wants to use this model for scenario analysis or risk assessment. (Transition: We’ve seen the overall fit and current coefficients. Next, slide 15 will focus on how we attribute specific recent swings in term premium to the drivers, using the no-intercept model. This will highlight what caused the big moves in the term premium over the last year or two.)
+Slide 15: No-Intercept Attribution – Drivers of Recent Term Premium Swings
+This slide zooms in on the evolution of the term premium in the recent period and attributes the swings to each factor (with no constant term). Essentially, it’s a timeline of the 2s10s spread over the last couple of years with colored segments or bars showing which factors pushed it up or down. Observations:
+Mid-Cycle vs Crisis Contributions: The slide mentions that “macro uncertainty has a larger share of contribution mid-cycle and post-pandemic.” Indeed, in relatively quieter times between major shocks, factors like inflation and growth uncertainty can explain much of the moderate undulations in term premium. For example, in 2021–2022, as inflation forecasts became volatile, that uncertainty component contributed to term premium oscillations even before any big supply news.
+Recent Movements = Combination of Supply, Fiscal, Macro: The term premium spike we’ve seen in late 2022 into 2023 was not due to a single factor – it was a combination:
+Supply/Demand: The convenience yield factor’s decline (safe asset premium falling) contributed – indicating that increased Treasury supply (and Fed QT reducing a major buyer) made Treasuries cheaper, pushing the term premium higher.
+Fiscal: Concurrently, expansionary fiscal developments (e.g., large budget deficits, fiscal stimulus, or simply the market realization of persistent high issuance needs) added to the upward pressure. Our model attributes a notable portion of the term premium increase to the fiscal factor, especially as it became clear that deficits would remain large.
+Macro Factors: We also see contributions from inflation uncertainty (think of the shocks to inflation in 2022 – as CPI surprised to the upside, term premium likely rose due to uncertainty about long-term price stability) and rate uncertainty (the Fed’s rapid hiking cycle introduced uncertainty about how high rates would go and how long they’d stay there, again steepening the curve). The “larger share mid-cycle” comment suggests that outside of acute events, these macro uncertainties steadily influence term premium.
+The net effect is that without an intercept, our attribution model can closely track the term premium’s ups and downs, confirming it wasn’t just random. We can explain why the curve steepened or flattened in each mini-episode. For instance, if someone asks “Why did the 2s10s spread whipsaw in mid-2023?”, we can answer: part of it was due to a swing in safe-haven demand (perhaps banking turmoil briefly increasing Treasury demand, then fading), part due to shifting deficit projections (debt ceiling resolution implying more issuance), and part due to changing inflation outlook as data came in. The model provides a narrative for those swings. Important for strategy: Knowing which factor drove a particular move can guide strategy:
+If supply factors drove the steepening, one might look at auction schedules, Fed QT pace, or foreign buyers’ activity to gauge if it will persist.
+If fiscal news drove it, keep an eye on Congress, budgets, and spending bills.
+If macro uncertainty drove it, then upcoming CPI releases or Fed communications (which reduce or increase uncertainty) are key to watch.
+(Transition: Next, slide 16 compares the time-varying coefficients of two critical factors in the no-intercept model – the convenience yield factor and the fiscal factor – to further illustrate the structural change we’ve observed. We’ll discuss how these driver sensitivities have shifted.)
+Slide 16: Evolution of Key Factor Coefficients (No Intercept)
+On this slide, we specifically highlight the rolling coefficients for the Treasury Convenience Yield factor and the Fiscal Expansion factor over time (with no intercept in the regression):
+Treasury Convenience Yield Coefficient: The chart shows how the impact of the convenience yield factor on term premium has changed. Historically, this coefficient has been consistently positive (meaning a drop in the factor – cheaper Treasuries – leads to a higher term premium). However, the strength of that effect has varied:
+It peaked during certain crises: For example, around 2013–2014 and 2020, the coefficient was quite high. This means during those periods, safe asset demand fluctuations packed a punch on the curve.
+In the current period, the coefficient is still positive but less potent than at its peak. The slide notes it’s “reliable but secondary today.” This suggests that while convenience yield changes still move the needle, the term premium’s sensitivity to it is somewhat lower now than when, say, a sudden shortage of safe assets could drastically flatten yields (because now other forces like fiscal are also at play).
+The slight decline in potency could be because the factor itself is low (Treasure are cheap now, possibly near a floor in how “cheap” they can get relative to others) or because investors are focusing on other risks. Regardless, convenience yield remains an important cyclical driver (especially for shorter-term swings), but it’s not the only story.
+Fiscal Expansion Coefficient: This is where we see a dramatic change:
+For a long time (pre-2020), this coefficient was near zero or insignificant – fiscal policy didn’t move term premium much, likely due to central bank suppression or simply lower variance in fiscal policy.
+Recently, the coefficient has surged into positive significance. The slide wording: “flipped from noise to first-order significance — a possible structural shift.” Now a unit shock in the fiscal factor (e.g., a big jump in expected deficits or debt supply) has a much larger upward impact on term premium than before.
+We can interpret this as the market now pricing in fiscal risk into long-term yields. With the Fed stepping back from bond-buying and global savings patterns changing, Treasury supply matters to the curve again. The change is so marked that it suggests we are in a new paradigm where fiscal expansion risk must be actively monitored by PMs (it’s no longer “background noise” – it’s arguably a driver on par with or even exceeding the traditional safe-haven factor at times).
+Model performance in extreme regimes: One bullet on the slide notes: “Without intercept, the model tracks term premium swings but struggles at pure regime shift peaks (2014, 2020) without baseline.” This acknowledges that during the very peaks of stress (e.g., the taper tantrum spike in term premium, or the COVID crash), the no-intercept model underestimates the term premium a bit. That’s because in those extremes, there was a sudden unexplained component (which, in the with-intercept model, was captured by a large intercept temporarily). In plain terms, extreme shocks had an effect beyond our steady factors – such as a sudden surge of uncertainty or technical factors. In 2014, for example, the abrupt spike likely had a feedback loop and positioning unwinds that a linear macro model can’t fully capture. But apart from those short-lived overshoots, the model did well.
+Implication: We as portfolio strategists should be aware that during crisis moments, term premium can overshoot fundamentals temporarily (those would be times to potentially add positions if one believes it will mean-revert). The fact that our model struggled only at those peaks means those were likely overshoots beyond steady-state drivers, which often correct fairly quickly. (Transition: So far, our analysis was on the 2s10s segment – the prototypical term premium measure. One may wonder, do these findings generalize to other parts of the curve? Slide 17 addresses that by applying our attribution to 5s30s and 10s30s spreads, the longer-end segments.)
+Slide 17: Attribution for 5s30s and 10s30s – Comparing Curve Segments
+In this slide, we extend our no-intercept attribution model to two other yield curve spreads: 5s30s (5-year vs 30-year yields) and 10s30s (10-year vs 30-year yields). These represent term premiums over longer sections of the curve (especially 10s30s is the ultra-long end spread). Findings:
+Directional Similarity: Both 5s30s and 10s30s term premium proxies show similar directional patterns and driver mix as 2s10s. That is, when 2s10s steepened due to our factors, typically 5s30s and 10s30s also steepened (and vice versa). The same categories of factors (supply/demand, fiscal, macro uncertainties) that we identified for 2s10s also play roles in the long-end spreads.
+“Damped” Magnitudes: However, the magnitude of moves and contributions in 5s30s or 10s30s is more muted (“damped”) compared to 2s10s. This makes intuitive sense: The 2s10s spread spans from the very front-end (highly sensitive to Fed expectations) to the 10-year point, so it captures a lot of policy-driven volatility and cyclicality. In contrast, 5s30s and especially 10s30s are more within the long end, which tends to move with more inertia (the 30-year is influenced by very long-run expectations, which don’t whip around as much day-to-day). So, for example, a given shock might steepen 2s10s by, say, 20 basis points but steepen 10s30s by only, say, 10 bp. The slide notes the evolution is proportional but with damped magnitude.
+Factor Effects Differ Slightly by Segment: Our six factors affect different parts of the curve with different strength:
+Convenience yield factor: Likely has a strong effect on all spreads, but possibly a bit less on 10s30s, since even if Treasuries are globally cheap, the 30-year yield also reflects far future expectations which might not move one-for-one with the intermediate segment.
+Fiscal supply: 30-year yields certainly respond to issuance (especially if issuance skew is towards longer maturities, but historically a lot of issuance is 5-10 year sector). The effect might be a bit diluted on 10s30s if most fiscal issuance is not in ultra-longs, but deficits affect overall duration supply which does reach 30s.
+Macro uncertainty: 10s30s might be less sensitive to near-term growth or Fed uncertainty and more to ultra-long inflation expectations. But if inflation risk rises, likely the whole curve shifts up somewhat consistently beyond 10 years (maybe a tad less if anchored long-term inflation expectations).
+The net message: Our framework holds up across the curve, reinforcing its robustness. For a portfolio manager, this means one can apply similar thinking for trades like 5s30s or 10s30s flatteners/steepeners – the same drivers (fiscal, demand, macro) should be considered. However, expect smaller swings on those long-end relative trades than on 2s10s, given the damped sensitivity. This also implies that when constructing relative value trades (like a 2s10s vs 10s30s steepener spread trade), one should account for these differences in factor impacts. Some factors might make the front end vs intermediate move more than the ultra-long vs long. (Transition: Having validated the model across curve segments, we shift gears now. So far we focused on attribution (explaining historical moves). Next, we turn to shock-response analysis – essentially forward-looking: how would the term premium react if a certain factor shock hits? Slide 18 introduces this vector autoregression (VAR) approach.)
+Slide 18: Shock-Response Analysis – VAR & IRFs (Introduction)
+(This is likely a section header slide titled “Shock–Response Analysis: Vector Autoregression and Impulse Response Functions.”) In this part of the presentation, we move from static regression to a dynamic analysis. We use a Vector Autoregression (VAR) model to analyze how shocks to certain factors propagate over time and affect the term premium. The main output of interest will be Impulse Response Functions (IRFs), which trace the effect of a one-time shock on term premium over subsequent weeks/months. The motivation: Attribution told us what contributed historically, but IRFs will tell us the causal impact and persistence of each driver:
+For example, if there’s a sudden spike in the convenience yield factor (say, a sudden dash for safety), how much and how long does the term premium react? Does it jump immediately then mean-revert, or does it set off a sustained trend?
+Similarly, if there’s a fiscal shock (e.g., a surprise deficit spending bill), what’s the time profile of its impact on the curve?
+Understanding these dynamics is crucial for timing trades and for scenario analysis (e.g., stress testing a portfolio for a supply shock). (Transition: Slide 19 will detail the VAR model setup and how we derive the impulse responses.)
+Slide 19: VAR Model Setup – Shock Propagation Framework
+Here we outline our Vector Autoregression model and how we compute impulse responses:
+VAR Variables: Our VAR includes the term premium and all our major factors in one system. Specifically, the vector $Y_t$ comprises:
+– 2s10s Term Premium (our dependent of interest)
+– Treasury Convenience Yield Factor
+– Fiscal Expansion Factor
+– Unemployment Gap
+– Inflation Uncertainty (forecast dispersion in CPI)
+– Growth Uncertainty (forecast dispersion in GDP)
+– Forward Rate Uncertainty (dispersion in short-rate forecasts) This essentially mirrors our regression factors but now we allow everything to influence each other dynamically. For instance, a shock to term premium itself could feed back into other variables, or a shock to inflation uncertainty might affect growth uncertainty, etc. By including all, we control for interdependencies.
+Model Specification: We use a standard VAR equation:
+$Y_t = c + A_1 Y_{t-1} + A_2 Y_{t-2} + ... + A_p Y_{t-p} + \varepsilon_t$, with $\varepsilon_t \sim N(0,\Sigma)$.
+We chose the lag length $p$ based on Akaike Information Criterion (AIC), which gave an optimal lag (likely 1 or 2 weekly lags, given weekly data). The exact lag isn’t as critical to mention, just that it’s optimally selected to capture dynamics without overfitting.
+Identification of Shocks: We are particularly interested in two structural shocks:
+A shock to the Convenience Yield factor (like a sudden change in safe asset demand or supply conditions).
+A shock to the Fiscal Expansion factor (like an unanticipated fiscal policy change or large jump in issuance).
+We treat these as exogenous impulses and trace their effect on the term premium variable, assuming a recursive identification where perhaps the ordering might put term premium after these factors (meaning the shock is initially in the factor, then term premium responds).
+Impulse Response Function (IRF): Formally, an IRF for term premium to a shock in factor $X$ is computed as:
+IRF
+𝑋
+→
+𝑇
+𝑃
+(
+ℎ
+)
+=
+∂
+ 
+𝑇
+𝑃
+𝑡
++
+ℎ
+∂
+ 
+𝜀
+𝑋
+,
+𝑡
+,
+IRF 
+X→TP
+​
+ (h)= 
+∂ε 
+X,t
+​
+ 
+∂TP 
+t+h
+​
+ 
+​
+ ,
+essentially the difference in future term premium if factor $X$ is shocked by one unit at time $t$. We compute IRFs for horizons $h$ out several months. The slide shows the formula in a more matrix form and notes:
+We accumulate responses over time to see persistence.
+We likely normalize the shock to a unit standard deviation shock in each factor for comparison.
+Why VAR? It “unifies all factors in one linear, recursive system.” This means we account for their co-movements. For example, a pure convenience yield shock might also indirectly cause changes in growth expectations or vice versa – the VAR captures that chain.
+(Transition: With the VAR in place, slide 20 will show the actual impulse response results for shocks to the two key factors (Convenience Yield and Fiscal Expansion), along with some summary metrics of those responses.)
+Slide 20: Impulse Responses – How Shocks Propagate Through the Curve
+This slide presents the Impulse Response Functions of the term premium for two scenarios:
+Shock to the Treasury Convenience Yield Factor, and
+Shock to the Fiscal Expansion Factor.
+We also summarize key metrics of these responses, such as the peak impact and persistence (e.g., cumulative impact over 3 months). Let’s interpret the results:
+Shock in Convenience Yield Factor (Safe-Asset Demand Shock):
+Imagine an event where suddenly Treasuries become much more sought-after (the convenience yield factor jumps up) or conversely a flood of supply makes them cheap (factor drops) – either way, a volatility in that factor. The IRF shows:
+The term premium’s response is more gradual (“slow”) and mean-reverting. The peak impact of the shock on term premium might not occur immediately; it builds up over a short horizon (e.g., within ~3 months). On our slide, the “Peak Impact (up to ~3M) ~ 9 bp” is noted for a unit shock. This suggests a one standard deviation safe-haven shock moves term premium by about 0.09 percentage points at most, and it takes a few weeks to reach that peak.
+After the peak, the effect dissipates (mean reverts) – meaning the term premium eventually returns toward baseline as the shock passes. We see a cumulative 3-month impact of ~12–13 bp, which implies that if you integrate the effect over 3 months, term premium was on average a few basis points higher each week, summing to ~0.12%. But by the end of those 3 months, the effect is gone or reversed.
+In plainer terms: A safe-haven demand shock (or supply shock) gives a moderate bump to the curve that is temporary. This IRF shape is characteristic of something like a technical or risk-off move that later normalizes.
+Trade implication: Because the convenience yield shock is transient, it’s ideal for short-term trading opportunities – particularly relative value trades. For instance, if a sudden scarcity of Treasuries richens them (flattening the curve), our analysis suggests that effect will ease off in the coming weeks. A portfolio manager might put on a short-term curve steepener (betting the curve will re-steepen) after an excessive flattening driven by a temporary safe-haven rush. Conversely, if a large auction or supply event cheapens Treasuries (steepens the curve sharply), one might take a short-term flattener expecting partial mean reversion. Essentially, use convenience-yield-driven swings as tactical, mean-reverting trades.
+Shock in Fiscal Expansion Factor (Fiscal Policy Shock):
+Now consider a scenario where fiscal outlook changes – say, a major stimulus package is announced or deficit projections jump unexpectedly. The IRF for term premium in this case is faster and more persistent:
+The term premium reacts almost immediately – a fiscal shock leads to an instant uptick in term premium (i.e., long rates jump relative to short rates). The peak impact might be very prompt (within a month or earlier). Although the slide’s text doesn’t list the exact peak bp, it implies a larger initial move than the convenience yield shock. We might infer something on the order of ~10+ bp initially.
+More importantly, the effect is persistent or even cumulative: the phrase “Fast and Persistent” and “ideal for medium-term directional trades” indicates that a fiscal shock tends to push the term premium to a higher level that lasts. The response doesn’t mean-revert quickly; instead, the curve stays steeper for a prolonged period (possibly many months).
+For example, a big deficit surprise could cause term premium to jump and essentially remain elevated as the market adjusts to a new debt trajectory – there’s no quick reversion because the fundamentals (debt, issuance, inflation risk) have structurally changed. The slide likely shows a significant cumulative impact (maybe larger than the convenience yield case).
+Trade implication: A fiscal-driven term premium move is one you might want to position with for the medium-term. If, for instance, you anticipate fiscal expansion (like you expect government spending to increase or QT to amplify supply pressure), you might position directionally for higher term premiums (e.g., be underweight duration or positioned in steepeners) and stay with that trade for a longer horizon. The analysis suggests those moves can be persistent trends rather than quick fades. Likewise, if you foresee fiscal tightening or improvement (rare these days, but hypothetically a surprise surplus), the flattening from that could be long-lasting, indicating a regime shift worth capturing over months.
+In summary:
+Fiscal shocks = trend-like, structural moves – align portfolio with them (directional trades on the level of yields or curve slope).
+Safe asset demand/supply shocks = oscillatory moves – consider contrarian trades to profit from the reversion (relative value trades like curve box trades, spread trades).
+(Visual cues: The slide likely has two IRF plots side by side: left for convenience yield shock, right for fiscal shock. The convenience yield IRF might show a curve that rises and then falls back to zero, whereas the fiscal IRF might rise and plateau above zero for an extended period.) There is also a reference on the slide to research by Furceri, Gonçalves, and Li (IMF) – presumably supporting the notion that fiscal shocks have lasting impacts on term premia. This external nod aligns our findings with academic research: fiscal expansions can cause persistent increases in term premium (which is also tied to potential crowding-out or inflationary expectations in macro literature). (Transition: Armed with this understanding of shock dynamics, we now pivot to predictive analysis – how we can use these factors and insights for forecasting and portfolio strategy. Slide 21 introduces the predictive angle, including a specific technique we used: quintile analysis.)
+Slide 21: Predictive Analysis – Quintile Bucketing & Forecasting
+This section is about translating our research findings into actionable forecasting tools. We will look at:
+Quintile Analysis: Sorting our factor levels into quintiles to see how extreme readings predict future changes in term premium.
+Forecasting Models: Simple models (like AR vs AR with factors) to gauge how adding our factors improves forward-looking predictions of term premium.
+The idea is to give portfolio managers a sense of leading indicators for term premium moves:
+Can the convenience yield factor today tell us if the term premium is likely to rise or fall in the coming weeks?
+Does an extreme fiscal factor reading foreshadow a trend in the curve over coming quarters?
+Also, if we formally forecast 2s10s spread, do macro factors add skill beyond just assuming persistence?
+We will explore these questions in the next slides, providing practical takeaways such as, “If Treasuries are extremely cheap by our measure, historically the term premium tends to mean-revert lower afterward,” and so on. (Transition: Let’s first examine the convenience yield factor as a predictor. Slide 22 will show how term premium tends to behave after the convenience yield factor hits extreme levels.)
+Slide 22: Convenience Yield Factor as a Predictor
+Question: “Does the Treasury Convenience Yield factor help predict future term premium movements?” We specifically test what happens after extreme readings of the convenience yield factor. The slide focuses on the scenario when the factor is very low (Quintile 1, the lowest 20% of its range, indicating Treasuries are very cheap relative to other assets). Finding: “When the convenience yield falls into Quintile 1 (extremely low), the term premium tends to fall afterward – suggesting a market correction.” This might sound counterintuitive at first: low convenience yield means high term premium (cheap Treasuries), so why would term premium then fall? The logic is mean reversion. If Treasuries become excessively cheap (perhaps oversold), historically that condition doesn’t persist; either demand comes back or conditions normalize, bringing term premium down from its extreme. In other words, an extremely steep 2s10s induced by a collapse in safe-haven demand usually partially unwinds in subsequent weeks. How we tested it: We bucketed each day/week by the level of the convenience yield factor (relative to the past year’s distribution). Then we tracked the subsequent change in term premium over various horizons for those in the lowest bucket (Quintile 1, “very cheap Treasuries” times). The slide’s chart “Impact of Treasury Convenience Yield on 21-day future term premium” likely shows that when the factor is low, the 2s10s spread tends to decrease in the next 21 days (the median/average change is negative). On the slide, the bullet points highlight:
+We indeed see mean reversion: “Extreme cheapness in Treasuries often tends to correct itself.” So if today Treasuries are extraordinarily cheap (perhaps due to a temporary dislocation or panic), in the next month or two the term premium usually narrows (long-end outperforms short-end).
+There is likely a small table with horizon (1 month, 3 months, 6 months, 12 months) and the average/median changes in term premium following a Quintile-1 event. The numbers (in percentages) are quite small but telling:
+E.g., at 1-month (21 trading days) after an extreme cheapness signal, the term premium might fall on average by ~2-3 basis points (0.02-0.03%). The median change might be similar or slightly higher, and the “hit rate” (frequency of term premium actually falling) is probably >50%. By 3 or 6 months, the cumulative mean reversion might be larger (~9-13 bp by 6 months, judging by snippet, which looks like -0.0927% mean for 6 months).
+Indeed the table snippet shows mean changes of around -0.09% (i.e. -9 bp) by 6 months and maybe -0.18% by 12 months, though the OCR was messy. This indicates a consistent downward drift in term premium after an extreme safe-asset cheapening. Not every instance will see a drop (hence median and hit rate are also given), but on balance the tendency is to correct.
+Portfolio takeaway: If our convenience yield factor flags that Treasuries are historically cheap (e.g., perhaps due to a risk-off unwind or liquidity event), a contrarian could expect the curve to flatten (term premium to decline) in the near future. In practice, a PM might initiate a bull flattening trade or add duration on the long end in expectation of a rally relative to the front end. Alternatively, avoid aggressively shorting the long end at those extremes, since odds favor a rebound. Another way to use this: incorporate the factor as a signal in tactical asset allocation or hedging. For instance, if you’re underweight bonds but the factor is at an extreme cheap level, maybe trim that underweight because the risk is a rally (term premium compression). (Transition: We’ve seen the convenience yield’s predictive power. Now, slide 23 asks the same question of the fiscal expansion factor – does an extreme fiscal condition signal future term premium moves?)
+Slide 23: Fiscal Expansion Factor as a Predictor
+Question: “Does the Fiscal Expansion factor help predict term premium?” We perform a similar quintile analysis for our fiscal factor (which is related to free-float debt and deficits):
+We look at instances when the Fiscal Expansion factor is at an extreme, say highest quintile (very expansionary fiscal stance / lots of debt supply) or lowest quintile (fiscal contraction or low supply environment). The phrasing suggests:
+“Low Fiscal Expansion Factor – Term premium likely to fall”
+“High Fiscal Expansion Factor – Term premium likely to rise.”
+This aligns with intuition:
+If the fiscal factor is low (meaning perhaps deficits are minimal or debt supply growth is slow relative to demand), then over the next couple of quarters, term premium tends to decline (the curve flattens) as there isn’t as much pressure from issuance or fiscal-stimulus-driven inflation risk. Essentially a benign fiscal backdrop allows term premium to ease.
+If the fiscal factor is high (big deficits, high debt growth), then going forward the term premium tends to increase (steepen further) as the supply keeps coming and potentially inflation risk accumulates.
+On the slide, there is mention of 2-quarter ahead 2s10s term premium impact. We specifically tested, for example, if the current fiscal factor is in top quintile, what happens to 2s10s over the next 6 months (2 quarters). The results:
+With Low Fiscal Expansion (e.g., lowest quintile free-float debt growth), term premium often falls over the next 6-12 months. The table snippet suggests that at the 1-quarter horizon, the mean change might be +0.16% (which is puzzling positive given “likely to fall” – possibly the sign is reversed in our interpretation or the table is showing something else like if debt is lowest quintile, maybe term premium was previously high and falls; the OCR was unclear). Let’s interpret qualitatively instead of the raw numbers: likely the mean change in term premium after a low fiscal factor is negative (term premium goes down).
+With High Fiscal Expansion, term premium tends to rise subsequently (so a steepening trend persists).
+The slide explicitly notes the scenario “when Free Float Debt/GDP is in its lowest quintile” (meaning relatively low supply environment), and shows “Impact of low Fiscal Expansion Factor on Term Premium Change” with some horizon stats. The pattern likely is term premium decreases over 1-4 quarters in that scenario (with perhaps modest average declines each quarter).
+Conversely, if we did the same for high fiscal expansion, we’d see the opposite sign.
+Interpretation: Fiscal dynamics operate on a somewhat slower, multi-quarter scale (unlike the convenience yield which gave a 1-3 month mean reversion signal). If the government is entering a period of heavier or lighter Treasury issuance relative to demand, that can set the tone for term premium for quarters to come. Practical takeaways for PMs:
+If you observe that fiscal policy is tightening or debt growth is moderating (perhaps economic boom ending, or policy turning austere) – and our factor confirms it’s in a low regime – you might expect term premiums to compress in coming quarters. This could support a bullish duration stance or flatteners for a longer-term horizon.
+Conversely, if deficits are ramping up (like now, where military, infrastructure, or stimulus spending is high and not offset by Fed purchases), and the factor is high, there’s a reasonable expectation that the term premium will continue to trend upward. In that case, a portfolio manager may stay underweight long duration, expecting further steepening, or use that info to calibrate how much of the fiscal story is already priced vs likely to deepen.
+One nuance: The analysis shows a signal but it’s “weak” in a sense (the slide likely would say something akin to initial evidence but needs more research). This is because while correlations exist, many other things happen over a multi-quarter horizon. So we treat these factor signals as one input in forecasting, not a guarantee. Still, they tilt the odds in a direction. (Transition: Having looked at individual factors as signals, slide 24 outlines a more formal forecasting pipeline from data to model selection. This sets the stage for combining factors into prediction models, which we’ll see on slide 25.)
+Slide 24: Forecasting Model Pipeline
+(This slide likely depicts a flowchart from data to model outputs, giving an overview of how we approached forecasting the term premium.) Key stages in the pipeline:
+Data Ingestion: We gather and preprocess all relevant data (the term premium proxy, our factor time series, possibly other candidates). Ensuring data quality and proper normalization (e.g., standardizing variables, dealing with any seasonality, etc.).
+Feature Engineering: Creating the factors we’ve discussed (convenience yield PCA factor, fiscal factor from debt metrics, calculating forecast dispersions, etc.). Possibly also generating lags or trends of these factors that might help forecasting.
+Model Selection: We likely tried a variety of forecasting models:
+AR (Autoregressive) models, which use the term premium’s own past to predict its future.
+ARX (Autoregressive with Exogenous factors) models, which include our drivers as additional predictors.
+Potentially more complex ones (though given time, probably we stuck to linear models and maybe mentioned exploring non-linear or machine learning models).
+Model Evaluation: Using rolling out-of-sample tests or cross-validation to see which models perform best. We might evaluate metrics like mean squared error, or success in predicting direction of change.
+Selection: Choose the model that gives the best predictive performance and economic interpretability.
+The slide emphasizes going from ingestion & engineering all the way to evaluation and selection. Essentially, we built a forecasting framework to test whether adding our macro factors improves forecast accuracy for term premium. (Transition: Next, slide 25 will show concrete results comparing a simple autoregressive model vs an AR model with our macro factors. We will see how much (or how little) those factors help in forecasting one step ahead.)
+Slide 25: Forecasting 2s10s: AR vs AR+Factors (ARX)
+This slide compares the results of two forecasting approaches for the 2s10s term premium:
+A simple AR(1) model – which predicts next period’s term premium based solely on its own last value (and perhaps a rolling mean).
+An ARX model – an AR(1) augmented with eXogenous inputs (our supply/fiscal/macro factors).
+We likely present the rolling out-of-sample prediction performance for each. Perhaps two charts:
+Left: AR(1) model rolling prediction (with actual vs predicted over time).
+Right: AR+Factors model rolling prediction.
+And possibly some error metrics or visual inspection of which better anticipates moves. Findings:
+The AR(1) model basically implies mean-reversion: it will predict that term premium stays around current levels with a slight drift to historical mean. This often does okay in stable periods but will miss turning points or regime shifts because it has no information about why things might change.
+The ARX model (with convenience yield, fiscal, etc.) has the potential to foresee moves when those factors significantly shift. For example, if our factors suddenly indicate a big change (say, convenience yield factor plunges, or a spike in fiscal factor), the ARX model can incorporate that to predict term premium will move more than usual.
+From the bullets on the slide:
+Adding the convenience yield and fiscal factors can add predictive power, but only when those factors are significant. In periods where those factors are dormant or not particularly trending, including them might just add noise to the model and could even slightly worsen short-term predictions (due to overfitting minor wiggles).
+However, “ARX-based models can provide more information when supply/fiscal signals become significant.” This suggests that around the regime shift we’ve been discussing (where fiscal became important), the model with factors would have alerted us earlier to the upward drift in term premium than the pure AR model, which might have assumed it would mean-revert lower as it did in the prior decade.
+In practice, what we saw:
+Around 2022, when term premium started rising from near zero towards positive territory, the AR(1) might have been slow to catch up (it would forecast maybe a mild increase at best), whereas the ARX model, seeing e.g. the convenience yield factor collapse and fiscal factor rise, would predict a stronger steepening – aligning more with what actually occurred.
+The charts likely show the AR model lagging the actual move, whereas the ARX model’s predicted line sticks closer to actual (especially at inflection points).
+Implication: Incorporating macro factors into forecasting models can be valuable in a changing regime. For a PM or strategist, a takeaway is:
+Relying only on historical patterns (AR) might mislead you when the underlying drivers are shifting (like moving from a low-term-premium regime to a high one).
+Including forward-looking indicators (supply, deficits, uncertainty) in your radar can improve your anticipation of curve changes.
+There is a caveat: when the factors are not flashing strong signals (they might sometimes give false alarms), an ARX might chase noise. We saw that in some periods adding factors “might add noise when these factors are not significant,” meaning you have to judge when to weight these factors’ indications versus just the momentum. That’s where economic judgment comes in – knowing the macro context. In sum, a combined approach is best: use AR as a baseline (term premium is persistent) but adjust forecasts when you observe meaningful moves in convenience yield, fiscal policy, or uncertainty measures, as those likely presage real changes in the term premium trajectory. (Transition: Now we’ve covered a lot – from drivers and attribution to predictive insights. Let’s wrap up with the broader conclusions and what this means for strategy going forward. Slide 26 will summarize our findings and characterize the current regime, and slide 27 will outline future research steps.)
+Slide 26: Conclusion & Outlook – Navigating the New Regime
+We conclude with the big-picture insights and strategic implications: 1. A New Regime of Term Premium Drivers:
+We are in a post-pandemic, post-QE regime where the balance of forces on the term premium has shifted:
+Expansionary Fiscal Policy is now a major player. Our analysis showed that fiscal expansion has begun playing a much larger role in term premium pricing than in the previous decade. Large deficits and debt issuance are fundamentally contributing to higher long-term yields. This is a break from the prior era where fiscal issues were often masked by central bank buying or global disinflation. Now, markets care about fiscal sustainability – and it’s reflected in term premium. For strategy, this means monitor fiscal indicators (issuance, debt, budget talks) closely; they feed directly into bond pricing now.
+Supply/Demand (Safe Asset Imbalance) – a nuanced role: There’s been a lot of market narrative around huge Treasury supply driving yields up (loss of the “safe asset premium”). Our findings qualify that: Yes, the convenience yield (safe asset demand) has decreased, contributing to term premium, but it was not the sole or even dominant driver of the recent term premium spike. In fact, we did not find strong evidence that the decline in the Treasury convenience yield alone explains most of the increase. It’s a factor, but perhaps not as large as headline supply numbers suggest. Why? Possibly because even though supply is high, some demand remains, and also fiscal effects (like higher inflation expectations) did more. For PMs, this means don’t simplify the story to “supply up = yields up”; look at who is absorbing that supply (if foreign buyers or banks are stepping in, the effect is smaller) and at fiscal-driven expectations.
+Macro Uncertainty Matters, but in Interaction: We saw hints of “initial weak signals” that these factors can be used predictively, but macro uncertainty (inflation, growth, rates) by itself also remains crucial, particularly in how it interacts with supply and fiscal:
+For example, larger deficits might not spike term premium if inflation is completely quiescent and Fed credibility is high. Conversely, moderate deficits could have a bigger impact if inflation is already unstable.
+We note that persistent inflation uncertainty is part of this new reality – unlike the 2010s when inflation was stuck below 2%, we now have to consider upside inflation risk premium.
+2. Fundamental Repricing of the Curve:
+The 2s10s curve movements we’ve dissected likely indicate a fundamental repricing as the market adjusts to:
+Larger deficits (fiscal trajectory),
+Quantitative Tightening (the Fed stepping away from being a constant bid on long Treasuries), and
+Persistent inflation uncertainty (not knowing if inflation will truly settle back to low levels or if another surge could happen).
+These factors combined mean the term premium is no longer depressed by artificial forces; it’s responding to fundamental economic conditions. So the steepening we saw is in part a structural upward reset of term premium. This suggests that we may not simply revert to the ultra-low term premiums of the 2010s unless those fundamental conditions reverse. 3. Importance for Asset Allocation:
+Understanding what’s driving term premium is crucial for anticipating bond market moves, as stated. If we know, for instance, that the current steepening is fundamentally driven, we might expect it to be sticky – which impacts how we allocate between equities and bonds (higher term premiums could make bonds relatively more attractive now than when term premiums were negative) and how we position on the curve. Also, if term premium is fundamentally higher, it could mean slightly higher neutral rates or at least higher long-term yields for the same policy rate – affecting everything from discount rates for equities to mortgage rates. 4. Continual Monitoring:
+Our conclusion emphasizes that we should continuously assess the balance between:
+Fiscal expansion effects (is fiscal thrust increasing or decreasing?),
+Supply absorption (are investors – domestically or globally – absorbing Treasuries well, or is there indigestion? We might monitor auction tails, bid-to-cover ratios, foreign participation, etc.), and
+Fundamental macro factors (where are we in the cycle? Is inflation risk rising or receding?).
+The interplay can change. For instance, if a recession hit (macro factor: unemployment gap surges), that might reduce term premium even if deficits are large (because recession might bring Fed cuts and safe-haven demand back). The slide’s Impact and Outlook bullet reinforces: The yield curve’s reconfiguration is telling us the market is coming to terms with a new reality (big deficits, less Fed support, more uncertainty). For the forward-looking guidance: Given the US fiscal trajectory (which looks to remain in significant deficit for years) and the Fed’s continued balance sheet reduction:
+We should be prepared for persistent upward pressure on term premium relative to the pre-2020 norm.
+This could mean the yield curve may not invert as deeply or could steepen more quickly after Fed hiking cycles, compared to previous cycles, due to that higher structural term premium.
+Relative value: fiscal and supply factors might also affect the shape of the curve (for instance, if the Treasury starts issuing more in 20- or 30-year sector vs 10-year, that could change which spread widens most – so monitoring issuance strategy is key).
+In summary, the strategic takeaway is: We’re in a regime shift – align your bond strategy accordingly. Don’t assume the ultra-low term premium environment will return soon; factor in fiscal and supply realities in your risk management. (Transition: Finally, slide 27 outlines our proposed next steps to enhance this research. I’ll briefly cover some improvements and extensions we’re considering, which might also interest those looking for further depth or collaboration.)
+Slide 27: Next Steps – Enhancements and Further Research
+We see this research as the beginning of a deeper exploration. To improve and extend it, we have a few avenues: Model Improvements:
+Exponentially Weighted Rolling Regression: Instead of a simple rolling window, give more weight to recent observations. This could adapt faster to regime changes by emphasizing the latest data in our attribution model. It might handle transitions more smoothly (e.g., catching the fiscal coefficient rise quicker).
+Non-Linear Prediction Models: The term premium process might have non-linear dynamics (e.g., it might behave differently when very low vs very high). We plan to explore models like:
+Logistic Regression to predict the probability of term premium increasing or decreasing over a horizon. This classification approach could complement point forecasts and be useful for risk management (e.g., “what’s the probability the curve steepens 50 bps in next 6 months?”).
+Multi-modal models: Perhaps combining different model types or regimes – for instance, one model for high-volatility regimes and another for low-volatility regimes, etc. or blending macro model with technical factors.
+And generally more complex machine learning with careful hyperparameter tuning to see if we can eke out better predictive power without overfitting. (Though any ML model must maintain interpretability for PMs to trust it – so we’ll balance that.)
+Quintile-based Forecasts: We already did simple quintile analyses; we might formalize that into a strategy – e.g., a rule-based approach: “if factor in top quintile, forecast term premium +X bps in 3M” – and test its performance historically. This non-linear approach (since it triggers only at extremes) could be combined with linear models.
+Input Improvements:
+Global Flows and Foreign Holdings: We want to incorporate the impact of foreign investments on term premium. For example, if Japan’s GPIF or European investors change their UST buying behavior, that affects the convenience yield. We could include foreign official holdings or FX-hedged yield differentials explicitly as predictors.
+Macro-Regime Awareness: Develop an attribution that knows if we’re in a high-inflation regime, or recession, etc. Perhaps allow different coefficients depending on macro regime (e.g., interacted variables or regime-switching models). This could improve accuracy since we observed how relationships differ by era.
+Bank Regulations and Other Structural Factors: Consider regulatory changes (like Supplementary Leverage Ratio changes, bank liquidity requirements, etc.) as these can suddenly alter demand for Treasuries (for instance, a regulation forcing banks to hold more safe assets could effectively create a convenience yield boost). We’d like to gauge the impact of such policy/regulatory shifts on term premium.
+Segmented Convenience Yields: Building separate “convenience yield” factors for different maturities – e.g., a short-end safety premium vs a long-end liquidity premium. This could help understand if, say, the front end is driving most of the scarcity effect versus the long end. If we refine our safe asset metric by segment, we might better attribute movements in spreads like 5s10s vs 10s30s (which we noticed differ in magnitude).
+All these improvements aim to make our framework more robust, real-time, and actionable. Ultimately, the goal is to help our portfolio managers and researchers stay ahead of the curve (pun intended) by understanding and predicting term premium dynamics in this evolving landscape. (Conclude the presentation:) Wrapping up, our research presents a framework to demystify the term premium using transparent market proxies. We showed how different drivers have waxed and waned in influence, with the current environment marked by fiscal dominance and a diminished “mystery” premium. We demonstrated ways to apply these insights, whether by anticipating moves or constructing trades based on factor signals. As this is an ongoing project, we welcome questions, discussions, and collaboration on how to refine these tools further. Thank you for your attention – I’ll now take any questions you have.
